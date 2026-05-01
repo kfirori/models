@@ -145,7 +145,8 @@
           Export as: <a href="javascript:saveAsPNG()">PNG</a> |
           <a href="javascript:saveAsSVG()">SVG</a> |
           <a href="javascript:saveAsLaTeX()">LaTeX</a> |
-          <a href="javascript:saveAsJson()">Json</a> |
+          <a href="javascript:saveAsJson()">Save As Json</a> |
+          <a href="javascript:loadFromJson()">Load Json</a> |
           <a href="javascript:toTuring()">Turing</a> |
           <a href="javascript:saveAsLaTeXForObsidian()">LaTeX for Obsidian</a>
 
@@ -158,9 +159,6 @@
           <label for="nodeRadiusSlider">Node radius: <span id="nodeRadiusValue">30</span></label><br>
           <input id="nodeRadiusSlider" type="range" min="15" max="60" value="30" style="width:100%"
             oninput="nodeRadius = +this.value; document.getElementById('nodeRadiusValue').textContent = this.value; draw();">
-        </div>
-        <div>
-          <a href="javascript:optimizeLayout()">Optimize layout</a>
         </div>
         <textarea id="output"></textarea>
       </div>

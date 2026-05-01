@@ -1194,154 +1194,6 @@ function clearCanvas() {
     saveBackup();
 }
 
-function optimizeLayout() {
-    if (nodes.length === 0) return;
-
-    var W = canvas.width;
-    var H = canvas.height;
-
-    // Measure label widths using the same font as drawText
-    var ctx = canvas.getContext('2d');
-    ctx.font = '20px "Times New Roman", serif';
-
-    // Effective radius of a node = max(nodeRadius, half the widest label line) + margin
-    function effRadius(node) {
-        var text = convertLatexShortcuts(node.text);
-        var lines = text.split('\\n');
-        var maxW = 0;
-        for (var li = 0; li < lines.length; li++) {
-            var w = ctx.measureText(lines[li]).width;
-            if (w > maxW) maxW = w;
-        }
-        return Math.max(nodeRadius, maxW / 2) + 12;
-    }
-
-    // Width of the widest label on links between nodes a and b (in either direction)
-    function linkLabelWidth(a, b) {
-        var maxW = 0;
-        for (var li = 0; li < links.length; li++) {
-            var lnk = links[li];
-            if ((lnk.nodeA === a && lnk.nodeB === b) ||
-                (lnk.nodeA === b && lnk.nodeB === a)) {
-                var text = convertLatexShortcuts(lnk.text);
-                var lines = text.split('\\n');
-                for (var mi = 0; mi < lines.length; mi++) {
-                    var w = ctx.measureText(lines[mi]).width;
-                    if (w > maxW) maxW = w;
-                }
-            }
-        }
-        return maxW;
-    }
-
-    if (nodes.length === 1) {
-        nodes[0].x = W / 2;
-        nodes[0].y = H / 2;
-        saveBackup();
-        draw();
-        return;
-    }
-
-    // Pre-compute effective radii
-    var effR = [];
-    for (var i = 0; i < nodes.length; i++) {
-        effR[i] = effRadius(nodes[i]);
-    }
-
-    // For each connected pair, the rest length = effR[i] + effR[j] + label width + gap
-    // For unconnected pairs, the minimum clearance = effR[i] + effR[j] + gap
-    var gap = 24; // minimum clear space between node edges
-    var restLen = [];
-    var minSep = [];
-    for (var i = 0; i < nodes.length; i++) {
-        restLen[i] = [];
-        minSep[i] = [];
-        for (var j = 0; j < nodes.length; j++) {
-            var lw = linkLabelWidth(nodes[i], nodes[j]);
-            restLen[i][j] = effR[i] + effR[j] + lw + gap;
-            minSep[i][j] = effR[i] + effR[j] + gap;
-        }
-    }
-
-    // Identify connected pairs for attraction
-    var connected = [];
-    for (var i = 0; i < nodes.length; i++) {
-        connected[i] = [];
-        for (var j = 0; j < nodes.length; j++) connected[i][j] = false;
-    }
-    for (var l = 0; l < links.length; l++) {
-        var lnk = links[l];
-        if (lnk.nodeA && lnk.nodeB && lnk.nodeA !== lnk.nodeB) {
-            var ai = nodes.indexOf(lnk.nodeA);
-            var bi = nodes.indexOf(lnk.nodeB);
-            if (ai >= 0 && bi >= 0) {
-                connected[ai][bi] = true;
-                connected[bi][ai] = true;
-            }
-        }
-    }
-
-    var temperature = Math.min(W, H) / 4;
-    var iterations = 500;
-    var cooling = temperature / iterations;
-
-    for (var iter = 0; iter < iterations; iter++) {
-        var fx = [], fy = [];
-        for (var i = 0; i < nodes.length; i++) { fx[i] = 0; fy[i] = 0; }
-
-        for (var i = 0; i < nodes.length; i++) {
-            for (var j = i + 1; j < nodes.length; j++) {
-                var dx = nodes[i].x - nodes[j].x;
-                var dy = nodes[i].y - nodes[j].y;
-                var dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
-                var nx = dx / dist;
-                var ny = dy / dist;
-
-                // Repulsion: keeps every pair beyond their minimum clearance
-                var ms = minSep[i][j];
-                var rep = (ms * ms) / dist;
-                fx[i] += nx * rep;
-                fy[i] += ny * rep;
-                fx[j] -= nx * rep;
-                fy[j] -= ny * rep;
-
-                // Attraction: linear spring toward rest length, only for connected pairs
-                if (connected[i][j]) {
-                    var stretch = dist - restLen[i][j];
-                    fx[i] += nx * stretch;
-                    fy[i] += ny * stretch;
-                    fx[j] -= nx * stretch;
-                    fy[j] -= ny * stretch;
-                }
-            }
-        }
-
-        // Apply displacement capped by temperature, clamped to canvas
-        for (var i = 0; i < nodes.length; i++) {
-            var mag = Math.sqrt(fx[i] * fx[i] + fy[i] * fy[i]) || 0.1;
-            var disp = Math.min(mag, temperature);
-            nodes[i].x += (fx[i] / mag) * disp;
-            nodes[i].y += (fy[i] / mag) * disp;
-            var pad = effR[i] + 8;
-            nodes[i].x = Math.max(pad, Math.min(W - pad, nodes[i].x));
-            nodes[i].y = Math.max(pad, Math.min(H - pad, nodes[i].y));
-        }
-
-        temperature = Math.max(temperature - cooling, 0.5);
-    }
-
-    // Reset link curvature — old perpendicular offsets are meaningless after relayout
-    for (var l = 0; l < links.length; l++) {
-        if (links[l].perpendicularPart !== undefined) {
-            links[l].perpendicularPart = 0;
-            links[l].lineAngleAdjust = 0;
-        }
-    }
-
-    saveBackup();
-    draw();
-}
-
 // Adjust link.perpendicularPart so the arc clears any node that lies on its straight path.
 // Uses the parabolic approximation: arc offset at t ≈ p × 4t(1-t).
 function autoAdjustLinkCurve(link) {
@@ -1470,7 +1322,7 @@ window.onload = function () {
             selectedObject = new Node(mouse.x, mouse.y);
             var k = 0;
             var used = nodes.map(function(n) { return n.text; });
-            while (used.indexOf('q_' + k) !== -1) k++;
+            while (unearresed.indexOf('q_' + k) !== -1) k++;
             selectedObject.text = 'q_' + k;
             nodes.push(selectedObject);
             resetCaret();
@@ -1784,15 +1636,115 @@ function saveAsJson() {
         }
     }
     var json = JSON.stringify(data, null, 2);
-    var blob = new Blob([json], { type: "application/json" });
-    var url = URL.createObjectURL(blob);
-    var downloadLink = document.createElement("a");
-    downloadLink.href = url;
-    downloadLink.download = "fsm.json";
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-    URL.revokeObjectURL(url);
+
+    if (window.showSaveFilePicker) {
+        window.showSaveFilePicker({
+            suggestedName: "fsm.json",
+            types: [{ description: "JSON file", accept: { "application/json": [".json"] } }],
+        }).then(function (fileHandle) {
+            return fileHandle.createWritable();
+        }).then(function (writable) {
+            writable.write(json);
+            return writable.close();
+        }).catch(function (err) {
+            if (err.name !== "AbortError") {
+                console.error(err);
+            }
+        });
+    } else {
+        var blob = new Blob([json], { type: "application/json" });
+        var url = URL.createObjectURL(blob);
+        var downloadLink = document.createElement("a");
+        downloadLink.href = url;
+        downloadLink.download = "fsm.json";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(url);
+    }
+}
+
+function loadJsonData(data) {
+    nodes = [];
+    links = [];
+
+    if (data.nodeRadius) {
+        nodeRadius = data.nodeRadius;
+        var slider = document.getElementById("nodeRadiusSlider");
+        if (slider) {
+            slider.value = nodeRadius;
+            document.getElementById("nodeRadiusValue").textContent = nodeRadius;
+        }
+    }
+    for (var i = 0; i < data.nodes.length; i++) {
+        var backupNode = data.nodes[i];
+        var node = new Node(backupNode.x, backupNode.y);
+        node.isAcceptState = backupNode.isAcceptState;
+        node.text = backupNode.text;
+        nodes.push(node);
+    }
+    for (var i = 0; i < data.links.length; i++) {
+        var backupLink = data.links[i];
+        var link = null;
+        if (backupLink.type === "SelfLink") {
+            link = new SelfLink(nodes[backupLink.node]);
+            link.anchorAngle = backupLink.anchorAngle;
+            link.text = backupLink.text;
+        } else if (backupLink.type === "StartLink") {
+            link = new StartLink(nodes[backupLink.node]);
+            link.deltaX = backupLink.deltaX;
+            link.deltaY = backupLink.deltaY;
+            link.text = backupLink.text;
+        } else if (backupLink.type === "Link") {
+            link = new Link(nodes[backupLink.nodeA], nodes[backupLink.nodeB]);
+            link.parallelPart = backupLink.parallelPart;
+            link.perpendicularPart = backupLink.perpendicularPart;
+            link.text = backupLink.text;
+            link.lineAngleAdjust = backupLink.lineAngleAdjust;
+        }
+        if (link !== null) {
+            links.push(link);
+        }
+    }
+    saveBackup();
+    draw();
+}
+
+function loadFromJson() {
+    if (window.showOpenFilePicker) {
+        window.showOpenFilePicker({
+            types: [{ description: "JSON file", accept: { "application/json": [".json"] } }],
+            multiple: false,
+        }).then(function (handles) {
+            return handles[0].getFile();
+        }).then(function (file) {
+            return file.text();
+        }).then(function (text) {
+            loadJsonData(JSON.parse(text));
+        }).catch(function (err) {
+            if (err.name !== "AbortError") {
+                alert("Failed to load file: " + err.message);
+            }
+        });
+    } else {
+        var input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json,application/json";
+        input.onchange = function () {
+            var file = input.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    loadJsonData(JSON.parse(e.target.result));
+                } catch (err) {
+                    alert("Failed to load file: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
 }
 
 function toTuring() {
