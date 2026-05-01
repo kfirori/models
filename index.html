@@ -135,6 +135,20 @@
         <span class="error">Your browser does not support<br />the HTML5 &lt;canvas&gt;
           element</span>
       </canvas>
+      <div id="tm-panel" style="background:white;border-radius:20px;padding:20px;max-width:1200px;width:100%;box-sizing:border-box;">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+          <b>Turing Machine Simulator</b>
+          <label style="margin-left:auto;">Input:&nbsp;<input id="tm-input" type="text" placeholder="tape content" style="font-family:monospace;font-size:13px;width:180px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"/></label>
+          <button onclick="tmInit()" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;">Load &amp; Reset</button>
+          <button onclick="tmStep()" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;">Step</button>
+          <button id="tm-run-btn" onclick="tmToggleRun()" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;">Run</button>
+          <label>Speed:&nbsp;<input id="tm-speed" type="range" min="1" max="10" value="5" style="width:70px;vertical-align:middle;"/></label>
+        </div>
+        <div id="tm-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
+        <div style="overflow-x:auto;">
+          <div id="tm-tape" style="display:flex;gap:3px;padding:4px 0;min-height:50px;align-items:center;"></div>
+        </div>
+      </div>
       <div>Created by <a href="https://madebyevan.com/">Evan Wallace</a> in 2010, thankfully modified by Moritz Liedtke
         in
         2024</div>
@@ -148,6 +162,7 @@
           <a href="javascript:saveAsJson()">Save As Json</a> |
           <a href="javascript:loadFromJson()">Load Json</a> |
           <a href="javascript:toTuring()">Turing</a> |
+          <a href="javascript:tmInit()">Simulate</a> |
           <a href="javascript:saveAsLaTeXForObsidian()">LaTeX for Obsidian</a>
 
 

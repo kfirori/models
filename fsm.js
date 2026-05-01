@@ -1158,6 +1158,17 @@ var currentLink = null; // a Link
 var movingObject = false;
 var originalClick;
 
+var tmState = null;
+var tmTape = [];
+var tmHead = 0;
+var tmTransitions = {};
+var tmInitialState = null;
+var tmAcceptState = null;
+var tmRunning = false;
+var tmRunTimer = null;
+var tmHalted = false;
+var tmCurrentNode = null;
+
 function drawUsing(c) {
     c.clearRect(0, 0, canvas.width, canvas.height);
     c.save();
@@ -1165,7 +1176,7 @@ function drawUsing(c) {
 
     for (var i = 0; i < nodes.length; i++) {
         c.lineWidth = 1;
-        c.fillStyle = c.strokeStyle = nodes[i] == selectedObject ? "blue" : "black";
+        c.fillStyle = c.strokeStyle = nodes[i] == selectedObject ? "blue" : (nodes[i] == tmCurrentNode ? "#e65100" : "black");
         nodes[i].draw(c);
     }
     for (var i = 0; i < links.length; i++) {
@@ -1322,7 +1333,7 @@ window.onload = function () {
             selectedObject = new Node(mouse.x, mouse.y);
             var k = 0;
             var used = nodes.map(function(n) { return n.text; });
-            while (unearresed.indexOf('q_' + k) !== -1) k++;
+            while (used.indexOf('q_' + k) !== -1) k++;
             selectedObject.text = 'q_' + k;
             nodes.push(selectedObject);
             resetCaret();
@@ -1808,6 +1819,183 @@ function toTuring() {
     navigator.clipboard.writeText(text).then(function () {
         window.open("https://alistat.eu/online/turingmachinesimulator", "_blank");
     });
+}
+
+function parseTuringProgram() {
+    var startLink = null;
+    var acceptNode = null;
+    for (var i = 0; i < links.length; i++) {
+        if (links[i] instanceof StartLink) { startLink = links[i]; break; }
+    }
+    for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].isAcceptState) { acceptNode = nodes[i]; break; }
+    }
+    var transitions = {};
+    var initialState = startLink ? 'q' + startLink.node.text : null;
+    var acceptState = acceptNode ? 'q' + acceptNode.text : null;
+    for (var i = 0; i < links.length; i++) {
+        var link = links[i];
+        var fromText, toText;
+        if (link instanceof Link) {
+            fromText = link.nodeA.text;
+            toText = link.nodeB.text;
+        } else if (link instanceof SelfLink) {
+            fromText = link.node.text;
+            toText = link.node.text;
+        } else {
+            continue;
+        }
+        var segments = link.text.trim().split(/\s{2,}/);
+        for (var j = 0; j < segments.length; j++) {
+            var segment = segments[j].trim();
+            if (!segment) continue;
+            var match = segment.match(/^(.+)\/(.+)\s+(\S+)$/);
+            if (match) {
+                var read = match[1].trim().replace(/\\ecell|\\dashv/g, '_');
+                var write = match[2].trim().replace(/\\ecell|\\dashv/g, '_');
+                var dir = match[3].trim().toLowerCase();
+                transitions['q' + fromText + '|' + read] = { to: 'q' + toText, write: write, dir: dir };
+            }
+        }
+    }
+    return { initialState: initialState, acceptState: acceptState, transitions: transitions };
+}
+
+function tmNodeForState(state) {
+    for (var i = 0; i < nodes.length; i++) {
+        if ('q' + nodes[i].text === state) return nodes[i];
+    }
+    return null;
+}
+
+function tmInit() {
+    document.getElementById('tm-panel').style.display = '';
+    var prog = parseTuringProgram();
+    if (!prog.initialState) {
+        document.getElementById('tm-status').innerHTML =
+            '<span style="color:#c62828;">No start state found &mdash; add a start arrow to the FSM, then click Load &amp; Reset.</span>';
+        tmTape = ['_'];
+        tmHead = 0;
+        tmRender();
+        return;
+    }
+    tmInitialState = prog.initialState;
+    tmAcceptState = prog.acceptState;
+    tmTransitions = prog.transitions;
+    tmHalted = false;
+    tmStopRun();
+    var input = document.getElementById('tm-input').value;
+    tmTape = input.length > 0 ? input.split('') : ['_'];
+    tmHead = 0;
+    tmState = tmInitialState;
+    tmCurrentNode = tmNodeForState(tmState);
+    document.getElementById('tm-status').textContent = 'State: ' + tmState;
+    tmRender();
+    draw();
+}
+
+function tmStep() {
+    if (tmHalted || tmState === null) return;
+    var cell = (tmHead >= 0 && tmHead < tmTape.length) ? tmTape[tmHead] : '_';
+    if (!cell) cell = '_';
+    var key = tmState + '|' + cell;
+    var trans = tmTransitions[key];
+
+    if (!trans) {
+        tmHalted = true;
+        var accepted = (tmState === tmAcceptState);
+        document.getElementById('tm-status').innerHTML = accepted
+            ? '<span style="color:#2e7d32;font-weight:bold;">&#10003; ACCEPTED</span>'
+            : '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> &mdash; no transition for state <b>' + tmState + '</b>, read <b>' + (cell === '_' ? '&#8710;' : cell) + '</b>';
+        tmStopRun();
+        tmRender();
+        draw();
+        return;
+    }
+
+    tmTape[tmHead] = trans.write;
+    if (trans.dir === 'r') {
+        tmHead++;
+        if (tmHead >= tmTape.length) tmTape.push('_');
+    } else if (trans.dir === 'l') {
+        if (tmHead === 0) tmTape.unshift('_');
+        else tmHead--;
+    }
+
+    tmState = trans.to;
+    tmCurrentNode = tmNodeForState(tmState);
+
+    if (tmAcceptState && tmState === tmAcceptState) {
+        tmHalted = true;
+        document.getElementById('tm-status').innerHTML =
+            '<span style="color:#2e7d32;font-weight:bold;">&#10003; ACCEPTED</span>';
+        tmStopRun();
+    } else {
+        document.getElementById('tm-status').textContent = 'State: ' + tmState;
+    }
+
+    tmRender();
+    draw();
+}
+
+function tmRender() {
+    var tapeEl = document.getElementById('tm-tape');
+    if (!tapeEl) return;
+    var windowSize = 30;
+    var start = Math.max(0, tmHead - Math.floor(windowSize / 2));
+    var end = start + windowSize;
+    while (tmTape.length <= end + 1) tmTape.push('_');
+
+    var html = '';
+    if (start > 0) html += '<span style="line-height:44px;padding:0 6px;font-size:18px;">&#8230;</span>';
+    for (var i = start; i <= end; i++) {
+        var ch = (i < tmTape.length ? tmTape[i] : '_') || '_';
+        var isHead = (i === tmHead);
+        var bg, fg, bord;
+        if (isHead) {
+            bg = tmHalted ? (tmState === tmAcceptState ? '#2e7d32' : '#c62828') : '#1565c0';
+            fg = '#fff';
+            bord = '2px solid #333';
+        } else {
+            bg = '#f5f5f5'; fg = '#000'; bord = '1px solid #bbb';
+        }
+        html += '<div style="min-width:38px;height:44px;display:flex;align-items:center;justify-content:center;' +
+            'background:' + bg + ';color:' + fg + ';border:' + bord + ';border-radius:4px;' +
+            'font-size:18px;font-family:monospace;font-weight:' + (isHead ? 'bold' : 'normal') + ';flex-shrink:0;">' +
+            (ch === '_' ? '&#8710;' : ch) + '</div>';
+    }
+    tapeEl.innerHTML = html;
+
+    var headIdx = tmHead - start;
+    var container = tapeEl.parentElement;
+    container.scrollLeft = Math.max(0, headIdx * 41 - container.clientWidth / 2 + 19);
+}
+
+function tmToggleRun() {
+    if (tmRunning) {
+        tmStopRun();
+    } else {
+        if (tmHalted) return;
+        tmRunning = true;
+        document.getElementById('tm-run-btn').textContent = 'Pause';
+        tmRunLoop();
+    }
+}
+
+function tmRunLoop() {
+    if (!tmRunning || tmHalted) { tmStopRun(); return; }
+    tmStep();
+    if (!tmHalted) {
+        var speedVal = parseInt(document.getElementById('tm-speed').value) || 5;
+        tmRunTimer = setTimeout(tmRunLoop, Math.round(1100 - speedVal * 100));
+    }
+}
+
+function tmStopRun() {
+    tmRunning = false;
+    var btn = document.getElementById('tm-run-btn');
+    if (btn) btn.textContent = 'Run';
+    if (tmRunTimer) { clearTimeout(tmRunTimer); tmRunTimer = null; }
 }
 
 const colors = ["#0169a3", "#5db12e", "#e56122"];
