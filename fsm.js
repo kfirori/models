@@ -784,6 +784,14 @@ function restoreBackup() {
     try {
         var backup = JSON.parse(localStorage["fsm"]);
 
+        if (backup.nodeRadius) {
+            nodeRadius = backup.nodeRadius;
+            var slider = document.getElementById("nodeRadiusSlider");
+            if (slider) {
+                slider.value = nodeRadius;
+                document.getElementById("nodeRadiusValue").textContent = nodeRadius;
+            }
+        }
         for (var i = 0; i < backup.nodes.length; i++) {
             var backupNode = backup.nodes[i];
             var node = new Node(backupNode.x, backupNode.y);
@@ -825,6 +833,7 @@ function saveBackup() {
     }
 
     var backup = {
+        nodeRadius: nodeRadius,
         nodes: [],
         links: [],
     };
@@ -1333,6 +1342,52 @@ function optimizeLayout() {
     draw();
 }
 
+// Adjust link.perpendicularPart so the arc clears any node that lies on its straight path.
+// Uses the parabolic approximation: arc offset at t ≈ p × 4t(1-t).
+function autoAdjustLinkCurve(link) {
+    if (!(link instanceof Link)) return;
+    var ax = link.nodeA.x, ay = link.nodeA.y;
+    var bx = link.nodeB.x, by = link.nodeB.y;
+    var dx = bx - ax, dy = by - ay;
+    var scale = Math.sqrt(dx * dx + dy * dy);
+    if (scale < 1) return;
+
+    var clearance = nodeRadius + 10;
+    var requiredP = 0;
+
+    for (var i = 0; i < nodes.length; i++) {
+        var node = nodes[i];
+        if (node === link.nodeA || node === link.nodeB) continue;
+
+        var cx = node.x, cy = node.y;
+        // How far along AB is this node (0 = at A, 1 = at B)?
+        var t = (dx * (cx - ax) + dy * (cy - ay)) / (scale * scale);
+        if (t <= 0 || t >= 1) continue;
+
+        // Signed perpendicular distance from the line AB (positive = left of A→B)
+        var d = (dx * (cy - ay) - dy * (cx - ax)) / scale;
+        if (Math.abs(d) >= clearance) continue; // already clear
+
+        // Parabolic factor: how much the arc deviates at this t
+        var ft = 4 * t * (1 - t);
+        if (ft < 0.1) continue; // too close to an endpoint to help
+
+        // Minimum p to push the arc (nodeRadius + 10) past the blocking node
+        var pNeeded = d >= 0
+            ? (d - clearance) / ft   // node is left → curve right (p < 0)
+            : (d + clearance) / ft;  // node is right → curve left (p > 0)
+
+        // Keep the constraint that demands the largest arc deflection
+        if (Math.abs(pNeeded) > Math.abs(requiredP)) {
+            requiredP = pNeeded;
+        }
+    }
+
+    if (requiredP !== 0) {
+        link.perpendicularPart = requiredP;
+    }
+}
+
 function selectObject(x, y) {
     for (var i = 0; i < nodes.length; i++) {
         if (nodes[i].containsPoint(x, y)) {
@@ -1413,6 +1468,10 @@ window.onload = function () {
 
         if (selectedObject == null) {
             selectedObject = new Node(mouse.x, mouse.y);
+            var k = 0;
+            var used = nodes.map(function(n) { return n.text; });
+            while (used.indexOf('q_' + k) !== -1) k++;
+            selectedObject.text = 'q_' + k;
             nodes.push(selectedObject);
             resetCaret();
             draw();
@@ -1466,6 +1525,7 @@ window.onload = function () {
 
         if (currentLink != null) {
             if (!(currentLink instanceof TemporaryLink)) {
+                autoAdjustLinkCurve(currentLink);
                 selectedObject = currentLink;
                 links.push(currentLink);
                 resetCaret();
@@ -1677,6 +1737,7 @@ function saveAsLaTeXForObsidian() {
 
 function saveAsJson() {
     var data = {
+        nodeRadius: nodeRadius,
         nodes: [],
         links: [],
     };
