@@ -1168,6 +1168,9 @@ var tmRunning = false;
 var tmRunTimer = null;
 var tmHalted = false;
 var tmCurrentNode = null;
+var tmCurrentLink = null;
+var tmLinkTimer = null;
+var tmStepCount = 0;
 
 function drawUsing(c) {
     c.clearRect(0, 0, canvas.width, canvas.height);
@@ -1176,12 +1179,25 @@ function drawUsing(c) {
 
     for (var i = 0; i < nodes.length; i++) {
         c.lineWidth = 1;
-        c.fillStyle = c.strokeStyle = nodes[i] == selectedObject ? "blue" : (nodes[i] == tmCurrentNode ? "#e65100" : "black");
+        if (nodes[i] == tmCurrentNode && nodes[i] != selectedObject) {
+            c.beginPath();
+            c.arc(nodes[i].x, nodes[i].y, nodeRadius, 0, 2 * Math.PI, false);
+            c.fillStyle = '#1e90ff';
+            c.fill();
+            c.fillStyle = c.strokeStyle = 'black';
+        } else {
+            c.fillStyle = c.strokeStyle = nodes[i] == selectedObject ? "blue" : "black";
+        }
         nodes[i].draw(c);
     }
     for (var i = 0; i < links.length; i++) {
-        c.lineWidth = 1;
-        c.fillStyle = c.strokeStyle = links[i] == selectedObject ? "blue" : "black";
+        if (links[i] == tmCurrentLink) {
+            c.lineWidth = 2;
+            c.fillStyle = c.strokeStyle = '#1e90ff';
+        } else {
+            c.lineWidth = 1;
+            c.fillStyle = c.strokeStyle = links[i] == selectedObject ? "blue" : "black";
+        }
         links[i].draw(c);
     }
     if (currentLink != null) {
@@ -1851,8 +1867,9 @@ function parseTuringProgram() {
             if (!segment) continue;
             var match = segment.match(/^(.+)\/(.+)\s+(\S+)$/);
             if (match) {
-                var read = match[1].trim().replace(/\\ecell|\\dashv/g, '_');
-                var write = match[2].trim().replace(/\\ecell|\\dashv/g, '_');
+                var DASHV = String.fromCharCode(8867);
+                var read = match[1].trim().replace(/\\ecell/g, '_').replace(/\\dashv/g, DASHV);
+                var write = match[2].trim().replace(/\\ecell/g, '_').replace(/\\dashv/g, DASHV);
                 var dir = match[3].trim().toLowerCase();
                 transitions['q' + fromText + '|' + read] = { to: 'q' + toText, write: write, dir: dir };
             }
@@ -1885,10 +1902,13 @@ function tmInit() {
     tmHalted = false;
     tmStopRun();
     var input = document.getElementById('tm-input').value;
-    tmTape = input.length > 0 ? input.split('') : ['_'];
-    tmHead = 0;
+    var DASHV = String.fromCharCode(8867);
+    tmTape = [DASHV].concat(input.length > 0 ? input.split('') : ['_']);
+    tmHead = 1;
     tmState = tmInitialState;
     tmCurrentNode = tmNodeForState(tmState);
+    tmStepCount = 0;
+    document.getElementById('tm-step-counter').textContent = 'Steps: 0';
     document.getElementById('tm-status').textContent = 'State: ' + tmState;
     tmRender();
     draw();
@@ -1913,13 +1933,34 @@ function tmStep() {
         return;
     }
 
+    var firedLink = tmFindLink(tmState, trans.to);
+
+    var DASHV = String.fromCharCode(8867);
+    if (tmHead === 0 && trans.write !== DASHV) {
+        tmHalted = true;
+        document.getElementById('tm-status').innerHTML =
+            '<span style="color:#c62828;font-weight:bold;">&#10007; ERROR</span> &mdash; cannot overwrite the leftmost cell';
+        tmStopRun();
+        tmRender();
+        draw();
+        return;
+    }
+    if (trans.dir === 'l' && tmHead === 0) {
+        tmHalted = true;
+        document.getElementById('tm-status').innerHTML =
+            '<span style="color:#c62828;font-weight:bold;">&#10007; ERROR</span> &mdash; cannot move left from leftmost cell';
+        tmStopRun();
+        tmRender();
+        draw();
+        return;
+    }
+
     tmTape[tmHead] = trans.write;
     if (trans.dir === 'r') {
         tmHead++;
         if (tmHead >= tmTape.length) tmTape.push('_');
     } else if (trans.dir === 'l') {
-        if (tmHead === 0) tmTape.unshift('_');
-        else tmHead--;
+        tmHead--;
     }
 
     tmState = trans.to;
@@ -1934,8 +1975,28 @@ function tmStep() {
         document.getElementById('tm-status').textContent = 'State: ' + tmState;
     }
 
+    tmStepCount++;
+    document.getElementById('tm-step-counter').textContent = 'Steps: ' + tmStepCount;
+
+    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+    tmCurrentLink = firedLink;
+    var speedVal = parseInt(document.getElementById('tm-speed').value) || 5;
+    var highlightMs = Math.round((1100 - speedVal * 100) * 0.7);
+    tmLinkTimer = setTimeout(function() { tmCurrentLink = null; draw(); }, highlightMs);
+
     tmRender();
     draw();
+}
+
+function tmFindLink(fromState, toState) {
+    var fromText = fromState.substring(1);
+    var toText = toState.substring(1);
+    for (var i = 0; i < links.length; i++) {
+        var lnk = links[i];
+        if (lnk instanceof Link && lnk.nodeA.text === fromText && lnk.nodeB.text === toText) return lnk;
+        if (lnk instanceof SelfLink && lnk.node.text === fromText && fromText === toText) return lnk;
+    }
+    return null;
 }
 
 function tmRender() {
@@ -2034,7 +2095,7 @@ function generateRandomConfetti() {
         {
             angle: 90,
             origin: { x: randomInRange(0.1, 0.9), y: 1.2 },
-            ...defaultSettings,
+            ...defaultSeadttings,
         },
     ][Math.floor(Math.random() * 3)];
 }
