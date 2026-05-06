@@ -1145,6 +1145,11 @@ function resetCaret() {
     caretVisible = true;
 }
 
+function tmClearInvalidLink(obj) {
+    var idx = tmInvalidLinks.indexOf(obj);
+    if (idx !== -1) tmInvalidLinks.splice(idx, 1);
+}
+
 var canvas;
 var nodeRadius = 30;
 var nodes = [];
@@ -1171,6 +1176,8 @@ var tmCurrentNode = null;
 var tmCurrentLink = null;
 var tmLinkTimer = null;
 var tmStepCount = 0;
+var tmInvalidLinks = [];
+var tmHistory = [];
 
 function drawUsing(c) {
     c.clearRect(0, 0, canvas.width, canvas.height);
@@ -1194,9 +1201,15 @@ function drawUsing(c) {
         if (links[i] == tmCurrentLink) {
             c.lineWidth = 2;
             c.fillStyle = c.strokeStyle = '#1e90ff';
+        } else if (links[i] == selectedObject) {
+            c.lineWidth = 1;
+            c.fillStyle = c.strokeStyle = 'blue';
+        } else if (tmInvalidLinks.indexOf(links[i]) !== -1) {
+            c.lineWidth = 1;
+            c.fillStyle = c.strokeStyle = '#c62828';
         } else {
             c.lineWidth = 1;
-            c.fillStyle = c.strokeStyle = links[i] == selectedObject ? "blue" : "black";
+            c.fillStyle = c.strokeStyle = 'black';
         }
         links[i].draw(c);
     }
@@ -1449,6 +1462,7 @@ document.onkeydown = function (e) {
     } else if (key == 8) {
         // backspace key
         if (selectedObject != null && "text" in selectedObject) {
+            tmClearInvalidLink(selectedObject);
             selectedObject.text = selectedObject.text.substr(
                 0,
                 selectedObject.text.length - 1
@@ -1462,6 +1476,7 @@ document.onkeydown = function (e) {
     } else if (key == 13) {
         // enter key
         if (selectedObject != null && "text" in selectedObject) {
+            tmClearInvalidLink(selectedObject);
             selectedObject.text += "\\n";
             resetCaret();
             draw();
@@ -1473,6 +1488,7 @@ document.onkeydown = function (e) {
         if (selectedObject == null) {
             mehrKonfetti();
         } else if ("text" in selectedObject) {
+            tmClearInvalidLink(selectedObject);
             selectedObject.text += " ";
             resetCaret();
             draw();
@@ -1504,6 +1520,7 @@ document.onkeypress = function (e) {
         selectedObject != null &&
         "text" in selectedObject
     ) {
+        tmClearInvalidLink(selectedObject);
         selectedObject.text += String.fromCharCode(key);
         resetCaret();
         draw();
@@ -1819,7 +1836,7 @@ function toTuring() {
                 var read = match[1].replace(/\\ecell|\\dashv/g, "_");
                 var write = match[2].replace(/\\ecell|\\dashv/g, "_");
                 var dir = match[3].toLowerCase();
-                lines.push("q" + fromText + " " + read + " q" + toText + " " + write + " " + dir);
+                lines.push(tmStateName(fromText) + " " + read + " " + tmStateName(toText) + " " + write + " " + dir);
             }
         }
     }
@@ -1847,8 +1864,8 @@ function parseTuringProgram() {
         if (nodes[i].isAcceptState) { acceptNode = nodes[i]; break; }
     }
     var transitions = {};
-    var initialState = startLink ? 'q' + startLink.node.text : null;
-    var acceptState = acceptNode ? 'q' + acceptNode.text : null;
+    var initialState = startLink ? tmStateName(startLink.node.text) : null;
+    var acceptState = acceptNode ? tmStateName(acceptNode.text) : null;
     for (var i = 0; i < links.length; i++) {
         var link = links[i];
         var fromText, toText;
@@ -1871,37 +1888,164 @@ function parseTuringProgram() {
                 var read = match[1].trim().replace(/\\ecell/g, '_').replace(/\\dashv/g, DASHV);
                 var write = match[2].trim().replace(/\\ecell/g, '_').replace(/\\dashv/g, DASHV);
                 var dir = match[3].trim().toLowerCase();
-                transitions['q' + fromText + '|' + read] = { to: 'q' + toText, write: write, dir: dir };
+                transitions[tmStateName(fromText) + '|' + read] = { to: tmStateName(toText), write: write, dir: dir };
             }
         }
     }
     return { initialState: initialState, acceptState: acceptState, transitions: transitions };
 }
 
+function tmSaveHistory() {
+    tmHistory.push({
+        tape: tmTape.slice(),
+        head: tmHead,
+        state: tmState,
+        stepCount: tmStepCount,
+        halted: tmHalted
+    });
+}
+
+function tmStepBack() {
+    if (tmHistory.length === 0) return;
+    if (tmRunning) tmStopRun();
+    var prev = tmHistory.pop();
+    tmTape = prev.tape;
+    tmHead = prev.head;
+    tmState = prev.state;
+    tmStepCount = prev.stepCount;
+    tmHalted = prev.halted;
+    tmCurrentNode = tmNodeForState(tmState);
+    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+    tmCurrentLink = null;
+    document.getElementById('tm-step-counter').textContent = 'Steps: ' + tmStepCount;
+    document.getElementById('tm-status').textContent = 'State: ' + tmState;
+    tmRender();
+    draw();
+}
+
+function tmShowSpeedTooltip(slider) {
+    var tooltip = document.getElementById('tm-speed-tooltip');
+    if (!tooltip) return;
+    var pct = (slider.value - slider.min) / (slider.max - slider.min);
+    var thumbOffset = pct * slider.offsetWidth;
+    tooltip.style.left = thumbOffset + 'px';
+    tooltip.textContent = slider.value + ' Hz';
+    tooltip.style.display = 'block';
+}
+
+function tmHideSpeedTooltip() {
+    var tooltip = document.getElementById('tm-speed-tooltip');
+    if (tooltip) tooltip.style.display = 'none';
+}
+
+function tmConvertArgs(input) {
+    return input.split(',').map(function(arg) {
+        var n = parseInt(arg.trim(), 10);
+        return isNaN(n) || n < 0 ? arg.trim() : '1'.repeat(n);
+    }).join('#');
+}
+
+function tmUpdateInputPlaceholder() {
+    var mode = document.querySelector('input[name="tm-input-mode"]:checked');
+    var el = document.getElementById('tm-input');
+    var resultLabel = document.getElementById('tm-result-label');
+    var isArgs = mode && mode.value === 'args';
+    if (el) el.placeholder = isArgs ? 'e.g. 3,0,2' : 'ε';
+    if (resultLabel) resultLabel.style.display = isArgs ? '' : 'none';
+}
+
+function tmDecodeResult() {
+    var positions = [];
+    for (var i = 0; i < tmTape.length; i++) {
+        if (tmTape[i] === '$') positions.push(i);
+    }
+    if (positions.length !== 2) return 'Error';
+    var between = tmTape.slice(positions[0] + 1, positions[1]).join('');
+    var segments = between.split('#');
+    var nums = [];
+    for (var j = 0; j < segments.length; j++) {
+        if (segments[j] !== '' && !/^1+$/.test(segments[j])) return 'Error';
+        nums.push(segments[j].length);
+    }
+    return nums.join(',');
+}
+
+function tmUpdateResult() {
+    var modeEl = document.querySelector('input[name="tm-input-mode"]:checked');
+    if (!modeEl || modeEl.value !== 'args') return;
+    var resultEl = document.getElementById('tm-result');
+    if (resultEl) resultEl.value = tmDecodeResult();
+}
+
+function tmStateName(text) {
+    return /^[a-zA-Z]/.test(text) ? text : 'q' + text;
+}
+
 function tmNodeForState(state) {
     for (var i = 0; i < nodes.length; i++) {
-        if ('q' + nodes[i].text === state) return nodes[i];
+        if (tmStateName(nodes[i].text) === state) return nodes[i];
     }
     return null;
 }
 
+function tmCompile() {
+    tmInvalidLinks = [];
+    var errors = [];
+
+    var startLinks = links.filter(function(l) { return l instanceof StartLink; });
+    if (startLinks.length === 0) {
+        errors.push('No initial state found — add a start arrow to the FSM.');
+    } else if (startLinks.length > 1) {
+        errors.push('More than one initial state found — only one start arrow is allowed.');
+    }
+
+    var sym = '(?:\\\\[a-zA-Z]+|[^\\s/])';
+    var segmentPattern = new RegExp('^' + sym + '\\/' + sym + '\\s+[LRlr]$');
+    for (var i = 0; i < links.length; i++) {
+        var link = links[i];
+        if (!(link instanceof Link) && !(link instanceof SelfLink)) continue;
+        if (!link.text || !link.text.trim()) continue;
+        var segments = link.text.trim().split(/\s{2,}/);
+        var invalid = false;
+        for (var j = 0; j < segments.length; j++) {
+            var seg = segments[j].trim();
+            if (!seg) continue;
+            if (!segmentPattern.test(seg)) { invalid = true; break; }
+        }
+        if (invalid) {
+            tmInvalidLinks.push(link);
+            if (link instanceof SelfLink) {
+                errors.push('Transition from <b>' + link.node.text + '</b> to itself is invalid.');
+            } else {
+                errors.push('Transition between <b>' + link.nodeA.text + '</b> and <b>' + link.nodeB.text + '</b> is invalid.');
+            }
+        }
+    }
+    return errors;
+}
+
 function tmInit() {
     document.getElementById('tm-panel').style.display = '';
-    var prog = parseTuringProgram();
-    if (!prog.initialState) {
+    var errors = tmCompile();
+    draw();
+    if (errors.length > 0) {
         document.getElementById('tm-status').innerHTML =
-            '<span style="color:#c62828;">No start state found &mdash; add a start arrow to the FSM, then click Load &amp; Reset.</span>';
+            '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
         tmTape = ['_'];
         tmHead = 0;
         tmRender();
         return;
     }
+    var prog = parseTuringProgram();
     tmInitialState = prog.initialState;
     tmAcceptState = prog.acceptState;
     tmTransitions = prog.transitions;
     tmHalted = false;
+    tmHistory = [];
     tmStopRun();
-    var input = document.getElementById('tm-input').value;
+    var rawInput = document.getElementById('tm-input').value;
+    var modeEl = document.querySelector('input[name="tm-input-mode"]:checked');
+    var input = (modeEl && modeEl.value === 'args') ? tmConvertArgs(rawInput) : rawInput;
     var DASHV = String.fromCharCode(8867);
     tmTape = [DASHV].concat(input.length > 0 ? input.split('') : ['_']);
     tmHead = 1;
@@ -1910,12 +2054,15 @@ function tmInit() {
     tmStepCount = 0;
     document.getElementById('tm-step-counter').textContent = 'Steps: 0';
     document.getElementById('tm-status').textContent = 'State: ' + tmState;
+    var resultEl = document.getElementById('tm-result');
+    if (resultEl) resultEl.value = '';
     tmRender();
     draw();
 }
 
 function tmStep() {
     if (tmHalted || tmState === null) return;
+    tmSaveHistory();
     var cell = (tmHead >= 0 && tmHead < tmTape.length) ? tmTape[tmHead] : '_';
     if (!cell) cell = '_';
     var key = tmState + '|' + cell;
@@ -1929,6 +2076,7 @@ function tmStep() {
             : '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> &mdash; no transition for state <b>' + tmState + '</b>, read <b>' + (cell === '_' ? '&#8710;' : cell) + '</b>';
         tmStopRun();
         tmRender();
+        tmUpdateResult();
         draw();
         return;
     }
@@ -1942,6 +2090,7 @@ function tmStep() {
             '<span style="color:#c62828;font-weight:bold;">&#10007; ERROR</span> &mdash; cannot overwrite the leftmost cell';
         tmStopRun();
         tmRender();
+        tmUpdateResult();
         draw();
         return;
     }
@@ -1951,6 +2100,7 @@ function tmStep() {
             '<span style="color:#c62828;font-weight:bold;">&#10007; ERROR</span> &mdash; cannot move left from leftmost cell';
         tmStopRun();
         tmRender();
+        tmUpdateResult();
         draw();
         return;
     }
@@ -1981,10 +2131,11 @@ function tmStep() {
     if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
     tmCurrentLink = firedLink;
     var speedVal = parseInt(document.getElementById('tm-speed').value) || 5;
-    var highlightMs = Math.round((1100 - speedVal * 100) * 0.7);
+    var highlightMs = Math.round(700 / speedVal);
     tmLinkTimer = setTimeout(function() { tmCurrentLink = null; draw(); }, highlightMs);
 
     tmRender();
+    if (tmHalted) tmUpdateResult();
     draw();
 }
 
@@ -2002,15 +2153,14 @@ function tmFindLink(fromState, toState) {
 function tmRender() {
     var tapeEl = document.getElementById('tm-tape');
     if (!tapeEl) return;
-    var windowSize = 30;
-    var start = Math.max(0, tmHead - Math.floor(windowSize / 2));
-    var end = start + windowSize;
-    while (tmTape.length <= end + 1) tmTape.push('_');
+    var container = tapeEl.parentElement;
+    var cellsVisible = Math.floor(container.clientWidth / 41);
+    var renderEnd = Math.max(tmTape.length - 1, tmHead + 5, cellsVisible);
+    while (tmTape.length <= renderEnd) tmTape.push('_');
 
     var html = '';
-    if (start > 0) html += '<span style="line-height:44px;padding:0 6px;font-size:18px;">&#8230;</span>';
-    for (var i = start; i <= end; i++) {
-        var ch = (i < tmTape.length ? tmTape[i] : '_') || '_';
+    for (var i = 0; i <= renderEnd; i++) {
+        var ch = tmTape[i] || '_';
         var isHead = (i === tmHead);
         var bg, fg, bord;
         if (isHead) {
@@ -2027,9 +2177,7 @@ function tmRender() {
     }
     tapeEl.innerHTML = html;
 
-    var headIdx = tmHead - start;
-    var container = tapeEl.parentElement;
-    container.scrollLeft = Math.max(0, headIdx * 41 - container.clientWidth / 2 + 19);
+    container.scrollLeft = Math.max(0, tmHead * 41 - container.clientWidth / 2 + 19);
 }
 
 function tmToggleRun() {
@@ -2038,7 +2186,7 @@ function tmToggleRun() {
     } else {
         if (tmHalted) return;
         tmRunning = true;
-        document.getElementById('tm-run-btn').textContent = 'Pause';
+        document.getElementById('tm-run-btn').textContent = '⏸';
         tmRunLoop();
     }
 }
@@ -2048,14 +2196,14 @@ function tmRunLoop() {
     tmStep();
     if (!tmHalted) {
         var speedVal = parseInt(document.getElementById('tm-speed').value) || 5;
-        tmRunTimer = setTimeout(tmRunLoop, Math.round(1100 - speedVal * 100));
+        tmRunTimer = setTimeout(tmRunLoop, Math.round(1000 / speedVal));
     }
 }
 
 function tmStopRun() {
     tmRunning = false;
     var btn = document.getElementById('tm-run-btn');
-    if (btn) btn.textContent = 'Run';
+    if (btn) btn.textContent = '▶';
     if (tmRunTimer) { clearTimeout(tmRunTimer); tmRunTimer = null; }
 }
 

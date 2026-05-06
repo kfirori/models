@@ -137,12 +137,21 @@
       </canvas>
       <div id="tm-panel" style="background:white;border-radius:20px;padding:20px;max-width:1200px;width:100%;box-sizing:border-box;">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-          <b>Turing Machine Simulator</b>
-          <label style="margin-left:auto;">Input:&nbsp;<input id="tm-input" type="text" placeholder="tape content" style="font-family:monospace;font-size:13px;width:180px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"/></label>
-          <button onclick="tmInit()" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;">Load &amp; Reset</button>
-          <button onclick="tmStep()" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;">Step</button>
-          <button id="tm-run-btn" onclick="tmToggleRun()" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;">Run</button>
-          <label>Speed:&nbsp;<input id="tm-speed" type="range" min="1" max="10" value="5" style="width:70px;vertical-align:middle;"/></label>
+          <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <label style="cursor:pointer;"><input type="radio" name="tm-input-mode" value="input" checked onchange="tmUpdateInputPlaceholder()"> Language</label>
+            <label style="cursor:pointer;"><input type="radio" name="tm-input-mode" value="args" onchange="tmUpdateInputPlaceholder()"> Function</label>
+            <input id="tm-input" type="text" placeholder="ε" style="font-family:monospace;font-size:13px;width:180px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"/>
+          </span>
+          <label id="tm-result-label" style="display:none;">Result:&nbsp;<input id="tm-result" type="text" readonly style="font-family:monospace;font-size:13px;width:120px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;"/></label>
+          <button onclick="tmInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
+          <button onclick="tmStepBack()" title="Step back" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
+          <button onclick="tmStep()" title="Step" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
+          <button id="tm-run-btn" onclick="tmToggleRun()" title="Run" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
+          <label>Speed:&nbsp;<span style="position:relative;display:inline-block;vertical-align:middle;">
+            <input id="tm-speed" type="range" min="1" max="100" value="5" style="width:70px;"
+              oninput="tmShowSpeedTooltip(this)" onmouseup="tmHideSpeedTooltip()" ontouchend="tmHideSpeedTooltip()"/>
+            <span id="tm-speed-tooltip" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:#333;color:#fff;font-size:11px;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);"></span>
+          </span></label>
           <span id="tm-step-counter" style="font-family:monospace;font-size:13px;">Steps: 0</span>
         </div>
         <div id="tm-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
