@@ -1178,6 +1178,10 @@ var tmLinkTimer = null;
 var tmStepCount = 0;
 var tmInvalidLinks = [];
 var tmHistory = [];
+var selectedNodes = [];
+var shiftNodePending = null;
+var lastDragMouse = null;
+var selectionRect = null;
 
 function drawUsing(c) {
     c.clearRect(0, 0, canvas.width, canvas.height);
@@ -1192,8 +1196,10 @@ function drawUsing(c) {
             c.fillStyle = '#1e90ff';
             c.fill();
             c.fillStyle = c.strokeStyle = 'black';
+        } else if (nodes[i] == selectedObject || selectedNodes.indexOf(nodes[i]) !== -1) {
+            c.fillStyle = c.strokeStyle = "blue";
         } else {
-            c.fillStyle = c.strokeStyle = nodes[i] == selectedObject ? "blue" : "black";
+            c.fillStyle = c.strokeStyle = "black";
         }
         nodes[i].draw(c);
     }
@@ -1217,6 +1223,21 @@ function drawUsing(c) {
         c.lineWidth = 1;
         c.fillStyle = c.strokeStyle = "black";
         currentLink.draw(c);
+    }
+
+    if (selectionRect !== null) {
+        var rx = Math.min(selectionRect.x1, selectionRect.x2);
+        var ry = Math.min(selectionRect.y1, selectionRect.y2);
+        var rw = Math.abs(selectionRect.x2 - selectionRect.x1);
+        var rh = Math.abs(selectionRect.y2 - selectionRect.y1);
+        c.save();
+        c.setLineDash([4, 3]);
+        c.lineWidth = 1;
+        c.strokeStyle = '#1565c0';
+        c.fillStyle = 'rgba(21, 101, 192, 0.08)';
+        c.fillRect(rx, ry, rw, rh);
+        c.strokeRect(rx, ry, rw, rh);
+        c.restore();
     }
 
     c.restore();
@@ -1329,17 +1350,28 @@ window.onload = function () {
 
         if (selectedObject != null) {
             if (shift && selectedObject instanceof Node) {
+                shiftNodePending = selectedObject;
                 currentLink = new SelfLink(selectedObject, mouse);
+                lastDragMouse = mouse;
             } else {
+                if (!shift && selectedNodes.indexOf(selectedObject) === -1) {
+                    selectedNodes = [];
+                }
                 movingObject = true;
                 deltaMouseX = deltaMouseY = 0;
+                lastDragMouse = mouse;
                 if (selectedObject.setMouseStart) {
                     selectedObject.setMouseStart(mouse.x, mouse.y);
                 }
             }
             resetCaret();
+        } else if (ctrl) {
+            selectionRect = {x1: mouse.x, y1: mouse.y, x2: mouse.x, y2: mouse.y};
+            selectedNodes = [];
         } else if (shift) {
             currentLink = new TemporaryLink(mouse, mouse);
+        } else {
+            selectedNodes = [];
         }
 
         draw();
@@ -1376,6 +1408,13 @@ window.onload = function () {
     canvas.onmousemove = function (e) {
         var mouse = crossBrowserRelativeMousePos(e);
 
+        if (selectionRect !== null) {
+            selectionRect.x2 = mouse.x;
+            selectionRect.y2 = mouse.y;
+            draw();
+            return;
+        }
+
         if (currentLink != null) {
             var targetNode = selectObject(mouse.x, mouse.y);
             if (!(targetNode instanceof Node)) {
@@ -1404,16 +1443,63 @@ window.onload = function () {
         }
 
         if (movingObject) {
-            selectedObject.setAnchorPoint(mouse.x, mouse.y);
-            if (selectedObject instanceof Node) {
-                snapNode(selectedObject);
+            if (selectedObject instanceof Node && selectedNodes.length > 1 && selectedNodes.indexOf(selectedObject) !== -1) {
+                var dx = mouse.x - lastDragMouse.x;
+                var dy = mouse.y - lastDragMouse.y;
+                for (var mi = 0; mi < selectedNodes.length; mi++) {
+                    selectedNodes[mi].x += dx;
+                    selectedNodes[mi].y += dy;
+                }
+            } else {
+                selectedObject.setAnchorPoint(mouse.x, mouse.y);
+                if (selectedObject instanceof Node) {
+                    snapNode(selectedObject);
+                }
             }
+            lastDragMouse = mouse;
             draw();
         }
     };
 
     canvas.onmouseup = function (e) {
+        var mouse = crossBrowserRelativeMousePos(e);
         movingObject = false;
+
+        if (selectionRect !== null) {
+            var minX = Math.min(selectionRect.x1, selectionRect.x2);
+            var maxX = Math.max(selectionRect.x1, selectionRect.x2);
+            var minY = Math.min(selectionRect.y1, selectionRect.y2);
+            var maxY = Math.max(selectionRect.y1, selectionRect.y2);
+            for (var si = 0; si < nodes.length; si++) {
+                if (nodes[si].x >= minX && nodes[si].x <= maxX &&
+                    nodes[si].y >= minY && nodes[si].y <= maxY) {
+                    if (selectedNodes.indexOf(nodes[si]) === -1) {
+                        selectedNodes.push(nodes[si]);
+                    }
+                }
+            }
+            selectionRect = null;
+            draw();
+            return;
+        }
+
+        if (shiftNodePending !== null) {
+            var ddx = mouse.x - originalClick.x;
+            var ddy = mouse.y - originalClick.y;
+            if (ddx * ddx + ddy * ddy < 36) {
+                currentLink = null;
+                var sidx = selectedNodes.indexOf(shiftNodePending);
+                if (sidx !== -1) {
+                    selectedNodes.splice(sidx, 1);
+                } else {
+                    selectedNodes.push(shiftNodePending);
+                }
+                shiftNodePending = null;
+                draw();
+                return;
+            }
+            shiftNodePending = null;
+        }
 
         if (currentLink != null) {
             if (!(currentLink instanceof TemporaryLink)) {
@@ -1429,11 +1515,14 @@ window.onload = function () {
 };
 
 var shift = false;
+var ctrl = false;
 
 document.onkeydown = function (e) {
     var key = crossBrowserKey(e);
 
-    if (key == 16) {
+    if (key == 17) {
+        ctrl = true;
+    } else if (key == 16) {
         shift = true;
     } else if (!canvasHasFocus()) {
         // don't read keystrokes when other things have focus
@@ -1503,6 +1592,9 @@ document.onkeyup = function (e) {
 
     if (key == 16) {
         shift = false;
+    } else if (key == 17) {
+        ctrl = false;
+        if (selectionRect !== null) { selectionRect = null; draw(); }
     }
 };
 
