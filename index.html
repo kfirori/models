@@ -100,6 +100,79 @@
      * Released under the MIT license
      */
 
+    function tmGetSpeedHz() {
+      var val = parseInt(document.getElementById('tm-speed').value);
+      return 0.25 * Math.pow(512, val / 100);
+    }
+
+    function tmClearSim() {
+      if (typeof tmRunning !== 'undefined' && tmRunning) tmStopRun();
+      document.getElementById('tm-input').value = '';
+      document.getElementById('tm-result').value = '';
+      document.getElementById('tm-status').textContent = '';
+      document.getElementById('tm-step-counter').textContent = 'Steps: 0';
+      if (typeof tmLinkTimer !== 'undefined' && tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+      if (typeof tmCurrentNode !== 'undefined') tmCurrentNode = null;
+      if (typeof tmCurrentLink !== 'undefined') tmCurrentLink = null;
+      if (typeof tmHistory !== 'undefined') tmHistory = [];
+      if (typeof draw === 'function') draw();
+    }
+
+    function dfaClearSim() {
+      if (typeof dfaRunning !== 'undefined' && dfaRunning) dfaStopRun();
+      document.getElementById('dfa-input').value = '';
+      document.getElementById('dfa-status').textContent = '';
+      document.getElementById('dfa-step-counter').textContent = 'Steps: 0';
+      if (typeof tmLinkTimer !== 'undefined' && tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+      if (typeof tmCurrentNode !== 'undefined') tmCurrentNode = null;
+      if (typeof tmCurrentLink !== 'undefined') tmCurrentLink = null;
+      if (typeof tmInvalidLinks !== 'undefined') tmInvalidLinks = [];
+      if (typeof dfaHistory !== 'undefined') dfaHistory = [];
+      var tapeEl = document.getElementById('dfa-tape');
+      if (tapeEl) tapeEl.innerHTML = '';
+      if (typeof draw === 'function') draw();
+    }
+
+    function dfaShowSpeedTooltip(slider) {
+      var tooltip = document.getElementById('dfa-speed-tooltip');
+      if (!tooltip) return;
+      var pct = (slider.value - slider.min) / (slider.max - slider.min);
+      tooltip.style.left = (pct * slider.offsetWidth) + 'px';
+      var hz = typeof dfaGetSpeedHz === 'function' ? dfaGetSpeedHz() : 1;
+      tooltip.textContent = hz < 1 ? hz.toFixed(2) + ' Hz' : hz < 10 ? hz.toFixed(1) + ' Hz' : Math.round(hz) + ' Hz';
+      tooltip.style.display = 'block';
+    }
+
+    function dfaHideSpeedTooltip() {
+      var tooltip = document.getElementById('dfa-speed-tooltip');
+      if (tooltip) tooltip.style.display = 'none';
+    }
+
+    function setSimMode(mode) {
+      if (typeof simMode !== 'undefined') simMode = mode;
+      var isTM = mode === 'tm';
+      document.getElementById('tm-sim-section').style.display = isTM ? '' : 'none';
+      document.getElementById('dfa-sim-section').style.display = isTM ? 'none' : '';
+      var tmBtn = document.getElementById('mode-tm-btn');
+      var dfaBtn = document.getElementById('mode-dfa-btn');
+      tmBtn.style.background = isTM ? '#d0e4f7' : '#f0f0f0';
+      tmBtn.style.fontWeight = isTM ? 'bold' : 'normal';
+      dfaBtn.style.background = isTM ? '#f0f0f0' : '#d0e4f7';
+      dfaBtn.style.fontWeight = isTM ? 'normal' : 'bold';
+      if (!isTM && typeof dfaRunning !== 'undefined' && dfaRunning) dfaStopRun();
+      if (isTM && typeof tmRunning !== 'undefined' && tmRunning) tmStopRun();
+      if (typeof tmCurrentNode !== 'undefined') tmCurrentNode = null;
+      if (typeof tmCurrentLink !== 'undefined') tmCurrentLink = null;
+      if (typeof tmInvalidLinks !== 'undefined') tmInvalidLinks = [];
+      if (typeof tmLinkTimer !== 'undefined' && tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+      if (typeof draw === 'function') draw();
+    }
+
+    function simInit() {
+      if (typeof simMode !== 'undefined' && simMode === 'dfa') dfaInit();
+      else tmInit();
+    }
+
     if (typeof btoa == "undefined") {
       function btoa(str) {
         var chars =
@@ -135,28 +208,59 @@
         <span class="error">Your browser does not support<br />the HTML5 &lt;canvas&gt;
           element</span>
       </canvas>
-      <div id="tm-panel" style="background:white;border-radius:20px;padding:20px;max-width:1200px;width:100%;box-sizing:border-box;">
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-          <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <label style="cursor:pointer;"><input type="radio" name="tm-input-mode" value="input" checked onchange="tmUpdateInputPlaceholder()"> Language</label>
-            <label style="cursor:pointer;"><input type="radio" name="tm-input-mode" value="args" onchange="tmUpdateInputPlaceholder()"> Function</label>
-            <input id="tm-input" type="text" placeholder="ε" style="font-family:monospace;font-size:13px;width:180px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"/>
-          </span>
-          <label id="tm-result-label" style="display:none;">Result:&nbsp;<input id="tm-result" type="text" readonly style="font-family:monospace;font-size:13px;width:120px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;"/></label>
-          <button onclick="tmInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
-          <button onclick="tmStepBack()" title="Step back" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
-          <button onclick="tmStep()" title="Step" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
-          <button id="tm-run-btn" onclick="tmToggleRun()" title="Run" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
-          <label>Speed:&nbsp;<span style="position:relative;display:inline-block;vertical-align:middle;">
-            <input id="tm-speed" type="range" min="1" max="100" value="5" style="width:70px;"
-              oninput="tmShowSpeedTooltip(this)" onmouseup="tmHideSpeedTooltip()" ontouchend="tmHideSpeedTooltip()"/>
-            <span id="tm-speed-tooltip" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:#333;color:#fff;font-size:11px;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);"></span>
-          </span></label>
-          <span id="tm-step-counter" style="font-family:monospace;font-size:13px;">Steps: 0</span>
+      <div id="sim-panel" style="background:white;border-radius:20px;padding:20px;max-width:1200px;width:100%;box-sizing:border-box;">
+        <div style="display:flex;gap:6px;margin-bottom:14px;">
+          <button id="mode-tm-btn" onclick="setSimMode('tm')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:12pt;font-weight:bold;">Turing Machine</button>
+          <button id="mode-dfa-btn" onclick="setSimMode('dfa')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:12pt;font-weight:normal;">DFA</button>
         </div>
-        <div id="tm-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
-        <div style="overflow-x:auto;">
-          <div id="tm-tape" style="display:flex;gap:3px;padding:4px 0;min-height:50px;align-items:center;"></div>
+        <div id="tm-sim-section">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+            <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <label style="cursor:pointer;"><input type="radio" name="tm-input-mode" value="input" checked onchange="tmUpdateInputPlaceholder()"> Language</label>
+              <label style="cursor:pointer;"><input type="radio" name="tm-input-mode" value="args" onchange="tmUpdateInputPlaceholder()"> Function</label>
+              <input id="tm-input" type="text" placeholder="ε" style="font-family:monospace;font-size:13px;width:180px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"/>
+            </span>
+            <label id="tm-result-label" style="display:none;">Result:&nbsp;<input id="tm-result" type="text" readonly style="font-family:monospace;font-size:13px;width:120px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;"/></label>
+            <span style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+              <button onclick="tmClearSim()" title="Clear input &amp; simulation" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#x2715;</button>
+              <button onclick="tmInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
+              <button onclick="tmStepBack()" title="Step back" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
+              <button onclick="tmStep()" title="Step" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
+              <button id="tm-run-btn" onclick="tmToggleRun()" title="Run" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
+              <label>Speed:&nbsp;<span style="position:relative;display:inline-block;vertical-align:middle;">
+                <input id="tm-speed" type="range" min="0" max="100" value="50" style="width:70px;"
+                  oninput="tmShowSpeedTooltip(this)" onmouseup="tmHideSpeedTooltip()" ontouchend="tmHideSpeedTooltip()"/>
+                <span id="tm-speed-tooltip" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:#333;color:#fff;font-size:11px;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);"></span>
+              </span></label>
+              <span id="tm-step-counter" style="font-family:monospace;font-size:13px;">Steps: 0</span>
+            </span>
+          </div>
+          <div id="tm-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
+          <div style="overflow-x:auto;">
+            <div id="tm-tape" style="display:flex;gap:3px;padding:4px 0;min-height:50px;align-items:center;"></div>
+          </div>
+        </div>
+        <div id="dfa-sim-section" style="display:none">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+            <input id="dfa-input" type="text" placeholder="input word (e.g. abba), empty for ε" style="font-family:monospace;font-size:13px;width:280px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"/>
+            <span style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+              <button onclick="dfaClearSim()" title="Clear input &amp; simulation" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#x2715;</button>
+              <button onclick="dfaInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
+              <button onclick="dfaStepBack()" title="Step back" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
+              <button onclick="dfaStep()" title="Step" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
+              <button id="dfa-run-btn" onclick="dfaToggleRun()" title="Run" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
+              <label>Speed:&nbsp;<span style="position:relative;display:inline-block;vertical-align:middle;">
+                <input id="dfa-speed" type="range" min="0" max="100" value="50" style="width:70px;"
+                  oninput="dfaShowSpeedTooltip(this)" onmouseup="dfaHideSpeedTooltip()" ontouchend="dfaHideSpeedTooltip()"/>
+                <span id="dfa-speed-tooltip" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:#333;color:#fff;font-size:11px;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);"></span>
+              </span></label>
+              <span id="dfa-step-counter" style="font-family:monospace;font-size:13px;">Steps: 0</span>
+            </span>
+          </div>
+          <div id="dfa-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
+          <div style="overflow-x:auto;">
+            <div id="dfa-tape" style="display:flex;gap:3px;padding:4px 0;min-height:50px;align-items:center;"></div>
+          </div>
         </div>
       </div>
       <div>Created by <a href="https://madebyevan.com/">Evan Wallace</a> in 2010, thankfully modified by Moritz Liedtke
@@ -172,7 +276,7 @@
           <a href="javascript:saveAsJson()">Save As Json</a> |
           <a href="javascript:loadFromJson()">Load Json</a> |
           <a href="javascript:toTuring()">Turing</a> |
-          <a href="javascript:tmInit()">Simulate</a> |
+          <a href="javascript:simInit()">Simulate</a> |
           <a href="javascript:saveAsLaTeXForObsidian()">LaTeX for Obsidian</a>
 
 

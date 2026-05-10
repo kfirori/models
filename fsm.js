@@ -1179,9 +1179,21 @@ var tmStepCount = 0;
 var tmInvalidLinks = [];
 var tmHistory = [];
 var selectedNodes = [];
-var shiftNodePending = null;
 var lastDragMouse = null;
 var selectionRect = null;
+
+var simMode = 'tm';
+var dfaInput = '';
+var dfaPosition = 0;
+var dfaState = null;
+var dfaTransitions = {};
+var dfaInitialState = null;
+var dfaAcceptStates = [];
+var dfaRunning = false;
+var dfaRunTimer = null;
+var dfaHalted = false;
+var dfaStepCount = 0;
+var dfaHistory = [];
 
 function drawUsing(c) {
     c.clearRect(0, 0, canvas.width, canvas.height);
@@ -1350,11 +1362,9 @@ window.onload = function () {
 
         if (selectedObject != null) {
             if (shift && selectedObject instanceof Node) {
-                shiftNodePending = selectedObject;
                 currentLink = new SelfLink(selectedObject, mouse);
-                lastDragMouse = mouse;
             } else {
-                if (!shift && selectedNodes.indexOf(selectedObject) === -1) {
+                if (selectedNodes.indexOf(selectedObject) === -1) {
                     selectedNodes = [];
                 }
                 movingObject = true;
@@ -1481,24 +1491,6 @@ window.onload = function () {
             selectionRect = null;
             draw();
             return;
-        }
-
-        if (shiftNodePending !== null) {
-            var ddx = mouse.x - originalClick.x;
-            var ddy = mouse.y - originalClick.y;
-            if (ddx * ddx + ddy * ddy < 36) {
-                currentLink = null;
-                var sidx = selectedNodes.indexOf(shiftNodePending);
-                if (sidx !== -1) {
-                    selectedNodes.splice(sidx, 1);
-                } else {
-                    selectedNodes.push(shiftNodePending);
-                }
-                shiftNodePending = null;
-                draw();
-                return;
-            }
-            shiftNodePending = null;
         }
 
         if (currentLink != null) {
@@ -2021,7 +2013,8 @@ function tmShowSpeedTooltip(slider) {
     var pct = (slider.value - slider.min) / (slider.max - slider.min);
     var thumbOffset = pct * slider.offsetWidth;
     tooltip.style.left = thumbOffset + 'px';
-    tooltip.textContent = slider.value + ' Hz';
+    var hz = tmGetSpeedHz();
+    tooltip.textContent = hz < 1 ? hz.toFixed(2) + ' Hz' : hz < 10 ? hz.toFixed(1) + ' Hz' : Math.round(hz) + ' Hz';
     tooltip.style.display = 'block';
 }
 
@@ -2117,7 +2110,7 @@ function tmCompile() {
 }
 
 function tmInit() {
-    document.getElementById('tm-panel').style.display = '';
+    document.getElementById('sim-panel').style.display = '';
     var errors = tmCompile();
     draw();
     if (errors.length > 0) {
@@ -2132,6 +2125,9 @@ function tmInit() {
     tmInitialState = prog.initialState;
     tmAcceptState = prog.acceptState;
     tmTransitions = prog.transitions;
+    var writesDollar = Object.keys(tmTransitions).some(function(k) { return tmTransitions[k].write === '$'; });
+    var modeRadio = document.querySelector('input[name="tm-input-mode"][value="' + (writesDollar ? 'args' : 'input') + '"]');
+    if (modeRadio) { modeRadio.checked = true; tmUpdateInputPlaceholder(); }
     tmHalted = false;
     tmHistory = [];
     tmStopRun();
@@ -2222,7 +2218,7 @@ function tmStep() {
 
     if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
     tmCurrentLink = firedLink;
-    var speedVal = parseInt(document.getElementById('tm-speed').value) || 5;
+    var speedVal = tmGetSpeedHz();
     var highlightMs = Math.round(700 / speedVal);
     tmLinkTimer = setTimeout(function() { tmCurrentLink = null; draw(); }, highlightMs);
 
@@ -2232,12 +2228,10 @@ function tmStep() {
 }
 
 function tmFindLink(fromState, toState) {
-    var fromText = fromState.substring(1);
-    var toText = toState.substring(1);
     for (var i = 0; i < links.length; i++) {
         var lnk = links[i];
-        if (lnk instanceof Link && lnk.nodeA.text === fromText && lnk.nodeB.text === toText) return lnk;
-        if (lnk instanceof SelfLink && lnk.node.text === fromText && fromText === toText) return lnk;
+        if (lnk instanceof Link && tmStateName(lnk.nodeA.text) === fromState && tmStateName(lnk.nodeB.text) === toState) return lnk;
+        if (lnk instanceof SelfLink && tmStateName(lnk.node.text) === fromState && fromState === toState) return lnk;
     }
     return null;
 }
@@ -2287,7 +2281,7 @@ function tmRunLoop() {
     if (!tmRunning || tmHalted) { tmStopRun(); return; }
     tmStep();
     if (!tmHalted) {
-        var speedVal = parseInt(document.getElementById('tm-speed').value) || 5;
+        var speedVal = tmGetSpeedHz();
         tmRunTimer = setTimeout(tmRunLoop, Math.round(1000 / speedVal));
     }
 }
@@ -2342,4 +2336,253 @@ function generateRandomConfetti() {
 
 function mehrKonfetti() {
     confetti(generateRandomConfetti());
+}
+
+// ─── DFA Simulator ───────────────────────────────────────────────────────────
+
+function dfaGetSpeedHz() {
+    var val = parseInt(document.getElementById('dfa-speed').value);
+    return 0.25 * Math.pow(512, val / 100);
+}
+
+function dfaStateName(text) {
+    return /^[a-zA-Z]/.test(text) ? text : 'q' + text;
+}
+
+function dfaNodeForState(state) {
+    for (var i = 0; i < nodes.length; i++) {
+        if (dfaStateName(nodes[i].text) === state) return nodes[i];
+    }
+    return null;
+}
+
+function dfaFindLink(fromState, toState) {
+    for (var i = 0; i < links.length; i++) {
+        var lnk = links[i];
+        if (lnk instanceof Link && dfaStateName(lnk.nodeA.text) === fromState && dfaStateName(lnk.nodeB.text) === toState) return lnk;
+        if (lnk instanceof SelfLink && dfaStateName(lnk.node.text) === fromState && fromState === toState) return lnk;
+    }
+    return null;
+}
+
+function dfaCompile() {
+    tmInvalidLinks = [];
+    var errors = [];
+    var startLinks = links.filter(function(l) { return l instanceof StartLink; });
+    if (startLinks.length === 0) {
+        errors.push('No initial state found — add a start arrow to the FSM.');
+    } else if (startLinks.length > 1) {
+        errors.push('More than one initial state found — only one start arrow is allowed.');
+    }
+    for (var i = 0; i < links.length; i++) {
+        var link = links[i];
+        if (!(link instanceof Link) && !(link instanceof SelfLink)) continue;
+        if (!link.text || !link.text.trim()) continue;
+        var symbols = link.text.trim().split(',').map(function(s) { return s.trim(); });
+        var invalid = symbols.some(function(s) { return s.length !== 1; });
+        if (invalid) {
+            tmInvalidLinks.push(link);
+            if (link instanceof SelfLink) {
+                errors.push('Transition from <b>' + link.node.text + '</b>: labels must be single characters separated by commas.');
+            } else {
+                errors.push('Transition <b>' + link.nodeA.text + '</b> → <b>' + link.nodeB.text + '</b>: labels must be single characters separated by commas.');
+            }
+        }
+    }
+    return errors;
+}
+
+function parseDfaProgram() {
+    var startLink = null;
+    for (var i = 0; i < links.length; i++) {
+        if (links[i] instanceof StartLink) { startLink = links[i]; break; }
+    }
+    var acceptNodes = nodes.filter(function(n) { return n.isAcceptState; });
+    var initialState = startLink ? dfaStateName(startLink.node.text) : null;
+    var acceptStates = acceptNodes.map(function(n) { return dfaStateName(n.text); });
+    var transitions = {};
+    for (var i = 0; i < links.length; i++) {
+        var link = links[i];
+        var fromText, toText;
+        if (link instanceof Link) { fromText = link.nodeA.text; toText = link.nodeB.text; }
+        else if (link instanceof SelfLink) { fromText = link.node.text; toText = link.node.text; }
+        else { continue; }
+        var symbols = link.text.trim().split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+        for (var j = 0; j < symbols.length; j++) {
+            transitions[dfaStateName(fromText) + '|' + symbols[j]] = { to: dfaStateName(toText), link: link };
+        }
+    }
+    return { initialState: initialState, acceptStates: acceptStates, transitions: transitions };
+}
+
+function dfaSaveHistory() {
+    dfaHistory.push({ position: dfaPosition, state: dfaState, stepCount: dfaStepCount, halted: dfaHalted });
+}
+
+function dfaInit() {
+    var errors = dfaCompile();
+    draw();
+    if (errors.length > 0) {
+        document.getElementById('dfa-status').innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
+        dfaRender();
+        return;
+    }
+    var prog = parseDfaProgram();
+    dfaInitialState = prog.initialState;
+    dfaAcceptStates = prog.acceptStates;
+    dfaTransitions = prog.transitions;
+    dfaHalted = false;
+    dfaHistory = [];
+    dfaStopRun();
+    dfaInput = document.getElementById('dfa-input').value;
+    dfaPosition = 0;
+    dfaState = dfaInitialState;
+    tmCurrentNode = dfaNodeForState(dfaState);
+    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+    tmCurrentLink = null;
+    dfaStepCount = 0;
+    document.getElementById('dfa-step-counter').textContent = 'Steps: 0';
+    document.getElementById('dfa-status').textContent = 'State: ' + dfaState;
+    dfaRender();
+    draw();
+}
+
+function dfaStep() {
+    if (dfaHalted || dfaState === null) return;
+    dfaSaveHistory();
+
+    if (dfaPosition >= dfaInput.length) {
+        dfaHalted = true;
+        var acc = dfaAcceptStates.indexOf(dfaState) !== -1;
+        document.getElementById('dfa-status').innerHTML = acc
+            ? '<span style="color:#2e7d32;font-weight:bold;">&#10003; ACCEPTED</span>'
+            : '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> — state <b>' + dfaState + '</b> is not an accept state';
+        dfaStopRun();
+        dfaRender();
+        draw();
+        return;
+    }
+
+    var ch = dfaInput[dfaPosition];
+    var trans = dfaTransitions[dfaState + '|' + ch];
+    if (!trans) {
+        dfaHalted = true;
+        document.getElementById('dfa-status').innerHTML =
+            '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> — no transition from state <b>' + dfaState + '</b> on <b>' + ch + '</b>';
+        dfaStopRun();
+        dfaRender();
+        draw();
+        return;
+    }
+
+    var firedLink = dfaFindLink(dfaState, trans.to);
+    dfaState = trans.to;
+    dfaPosition++;
+    dfaStepCount++;
+    document.getElementById('dfa-step-counter').textContent = 'Steps: ' + dfaStepCount;
+
+    tmCurrentNode = dfaNodeForState(dfaState);
+    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+    tmCurrentLink = firedLink;
+    var highlightMs = Math.round(700 / dfaGetSpeedHz());
+    tmLinkTimer = setTimeout(function() { tmCurrentLink = null; draw(); }, highlightMs);
+
+    if (dfaPosition >= dfaInput.length) {
+        dfaHalted = true;
+        var acc = dfaAcceptStates.indexOf(dfaState) !== -1;
+        document.getElementById('dfa-status').innerHTML = acc
+            ? '<span style="color:#2e7d32;font-weight:bold;">&#10003; ACCEPTED</span>'
+            : '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> — state <b>' + dfaState + '</b> is not an accept state';
+        dfaStopRun();
+    } else {
+        document.getElementById('dfa-status').textContent = 'State: ' + dfaState;
+    }
+
+    dfaRender();
+    draw();
+}
+
+function dfaStepBack() {
+    if (dfaHistory.length === 0) return;
+    if (dfaRunning) dfaStopRun();
+    var prev = dfaHistory.pop();
+    dfaPosition = prev.position;
+    dfaState = prev.state;
+    dfaStepCount = prev.stepCount;
+    dfaHalted = prev.halted;
+    tmCurrentNode = dfaNodeForState(dfaState);
+    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+    tmCurrentLink = null;
+    document.getElementById('dfa-step-counter').textContent = 'Steps: ' + dfaStepCount;
+    document.getElementById('dfa-status').textContent = 'State: ' + dfaState;
+    dfaRender();
+    draw();
+}
+
+function dfaToggleRun() {
+    if (dfaRunning) {
+        dfaStopRun();
+    } else {
+        if (dfaHalted) return;
+        dfaRunning = true;
+        document.getElementById('dfa-run-btn').textContent = '⏸';
+        dfaRunLoop();
+    }
+}
+
+function dfaRunLoop() {
+    if (!dfaRunning || dfaHalted) { dfaStopRun(); return; }
+    dfaStep();
+    if (!dfaHalted) {
+        dfaRunTimer = setTimeout(dfaRunLoop, Math.round(1000 / dfaGetSpeedHz()));
+    }
+}
+
+function dfaStopRun() {
+    dfaRunning = false;
+    var btn = document.getElementById('dfa-run-btn');
+    if (btn) btn.textContent = '►';
+    if (dfaRunTimer) { clearTimeout(dfaRunTimer); dfaRunTimer = null; }
+}
+
+function dfaRender() {
+    var tapeEl = document.getElementById('dfa-tape');
+    if (!tapeEl) return;
+    var input = dfaInput || '';
+    var len = input.length;
+    var acc = dfaHalted && dfaAcceptStates.indexOf(dfaState) !== -1;
+    var rej = dfaHalted && !acc;
+    var html = '';
+
+    for (var i = 0; i < len; i++) {
+        var ch = input[i];
+        var isHead = (i === dfaPosition);
+        var bg, fg, bord;
+        if (isHead) {
+            bg = dfaHalted ? (acc ? '#2e7d32' : '#c62828') : '#1565c0';
+            fg = '#fff'; bord = '2px solid #333';
+        } else if (i < dfaPosition) {
+            bg = '#e8e8e8'; fg = '#888'; bord = '1px solid #ccc';
+        } else {
+            bg = '#f5f5f5'; fg = '#000'; bord = '1px solid #bbb';
+        }
+        html += '<div style="min-width:38px;height:44px;display:flex;align-items:center;justify-content:center;' +
+            'background:' + bg + ';color:' + fg + ';border:' + bord + ';border-radius:4px;' +
+            'font-size:18px;font-family:monospace;font-weight:' + (isHead ? 'bold' : 'normal') + ';flex-shrink:0;">' +
+            ch + '</div>';
+    }
+
+    // end-of-input marker ⊣
+    var isEndHead = (dfaPosition >= len);
+    var eBg = isEndHead ? (dfaHalted ? (acc ? '#2e7d32' : '#c62828') : '#1565c0') : '#f5f5f5';
+    var eFg = isEndHead ? '#fff' : '#bbb';
+    var eBord = isEndHead ? '2px solid #333' : '1px dashed #ccc';
+    html += '<div style="min-width:38px;height:44px;display:flex;align-items:center;justify-content:center;' +
+        'background:' + eBg + ';color:' + eFg + ';border:' + eBord + ';border-radius:4px;' +
+        'font-size:18px;font-family:monospace;font-weight:' + (isEndHead ? 'bold' : 'normal') + ';flex-shrink:0;">' +
+        '⊣</div>';
+
+    tapeEl.innerHTML = html;
+    var container = tapeEl.parentElement;
+    if (container) container.scrollLeft = Math.max(0, dfaPosition * 41 - container.clientWidth / 2 + 19);
 }
