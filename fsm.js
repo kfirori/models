@@ -1192,12 +1192,11 @@ var dfaAcceptStates = [];
 var dfaRunning = false;
 var dfaRunTimer = null;
 var dfaHalted = false;
+var dfaAccepted = false;
 var dfaStepCount = 0;
 var dfaHistory = [];
 var dfaBlinkCell = -1;
-var dfaBlinkInterval = null;
 var dfaBlinkTimeout = null;
-var dfaBlinkOn = true;
 
 function drawUsing(c) {
     c.clearRect(0, 0, canvas.width, canvas.height);
@@ -2420,7 +2419,7 @@ function parseDfaProgram() {
 }
 
 function dfaSaveHistory() {
-    dfaHistory.push({ position: dfaPosition, state: dfaState, stepCount: dfaStepCount, halted: dfaHalted });
+    dfaHistory.push({ position: dfaPosition, state: dfaState, stepCount: dfaStepCount, halted: dfaHalted, accepted: dfaAccepted });
 }
 
 function dfaInit() {
@@ -2436,6 +2435,7 @@ function dfaInit() {
     dfaAcceptStates = prog.acceptStates;
     dfaTransitions = prog.transitions;
     dfaHalted = false;
+    dfaAccepted = false;
     dfaHistory = [];
     dfaStopRun();
     dfaStopBlink();
@@ -2462,8 +2462,8 @@ function dfaStep() {
 
     if (dfaPosition >= dfaInput.length) {
         dfaHalted = true;
-        var acc = dfaAcceptStates.indexOf(dfaState) !== -1;
-        document.getElementById('dfa-status').innerHTML = acc
+        dfaAccepted = dfaAcceptStates.indexOf(dfaState) !== -1;
+        document.getElementById('dfa-status').innerHTML = dfaAccepted
             ? '<span style="color:#2e7d32;font-weight:bold;">&#10003; ACCEPTED</span>'
             : '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> — state <b>' + dfaState + '</b> is not an accept state';
         dfaStopRun();
@@ -2476,6 +2476,7 @@ function dfaStep() {
     var trans = dfaTransitions[dfaState + '|' + ch];
     if (!trans) {
         dfaHalted = true;
+        dfaAccepted = false;
         document.getElementById('dfa-status').innerHTML =
             '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> — no transition from state <b>' + dfaState + '</b> on <b>' + ch + '</b>';
         dfaStopRun();
@@ -2496,8 +2497,8 @@ function dfaStep() {
 
     if (dfaPosition >= dfaInput.length) {
         dfaHalted = true;
-        var acc = dfaAcceptStates.indexOf(dfaState) !== -1;
-        document.getElementById('dfa-status').innerHTML = acc
+        dfaAccepted = dfaAcceptStates.indexOf(dfaState) !== -1;
+        document.getElementById('dfa-status').innerHTML = dfaAccepted
             ? '<span style="color:#2e7d32;font-weight:bold;">&#10003; ACCEPTED</span>'
             : '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> — state <b>' + dfaState + '</b> is not an accept state';
         dfaStopRun();
@@ -2518,6 +2519,7 @@ function dfaStepBack() {
     dfaState = prev.state;
     dfaStepCount = prev.stepCount;
     dfaHalted = prev.halted;
+    dfaAccepted = prev.accepted;
     tmCurrentNode = dfaNodeForState(dfaState);
     if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
     tmCurrentLink = null;
@@ -2554,23 +2556,14 @@ function dfaStopRun() {
 }
 
 function dfaStartBlink(link, cell, durationMs) {
-    if (dfaBlinkInterval) { clearInterval(dfaBlinkInterval); dfaBlinkInterval = null; }
     if (dfaBlinkTimeout) { clearTimeout(dfaBlinkTimeout); dfaBlinkTimeout = null; }
     dfaBlinkCell = cell;
-    dfaBlinkOn = true;
     tmCurrentLink = link;
-    var blinkPeriod = 180;
-    dfaBlinkInterval = setInterval(function() {
-        dfaBlinkOn = !dfaBlinkOn;
-        tmCurrentLink = dfaBlinkOn ? link : null;
-        draw();
-        dfaRender();
-    }, blinkPeriod);
+    draw();
+    dfaRender();
     dfaBlinkTimeout = setTimeout(function() {
-        if (dfaBlinkInterval) { clearInterval(dfaBlinkInterval); dfaBlinkInterval = null; }
         dfaBlinkTimeout = null;
         dfaBlinkCell = -1;
-        dfaBlinkOn = true;
         tmCurrentLink = null;
         draw();
         dfaRender();
@@ -2578,10 +2571,8 @@ function dfaStartBlink(link, cell, durationMs) {
 }
 
 function dfaStopBlink() {
-    if (dfaBlinkInterval) { clearInterval(dfaBlinkInterval); dfaBlinkInterval = null; }
     if (dfaBlinkTimeout) { clearTimeout(dfaBlinkTimeout); dfaBlinkTimeout = null; }
     dfaBlinkCell = -1;
-    dfaBlinkOn = true;
     tmCurrentLink = null;
 }
 
@@ -2590,20 +2581,16 @@ function dfaRender() {
     if (!tapeEl || tapeEl.style.display === 'none') return;
     var input = dfaInput || '';
     var len = input.length;
-    var acc = dfaHalted && dfaAcceptStates.indexOf(dfaState) !== -1;
+    var acc = dfaHalted && dfaAccepted;
     var html = '';
 
     for (var i = 0; i < len; i++) {
         var ch = input[i];
-        var isHead = (i === dfaPosition);
-        var isBlinkCell = (dfaBlinkCell === i && dfaBlinkInterval !== null);
+        var isBlinkCell = (dfaBlinkCell === i);
+        var isHead = (i === dfaPosition) && dfaBlinkCell === -1;
         var bg, fg, bord, fw;
         if (isBlinkCell) {
-            if (dfaBlinkOn) {
-                bg = '#ff8f00'; fg = '#fff'; bord = '2px solid #e65100'; fw = 'bold';
-            } else {
-                bg = '#e8e8e8'; fg = '#888'; bord = '1px solid #ccc'; fw = 'normal';
-            }
+            bg = '#ff8f00'; fg = '#fff'; bord = '2px solid #e65100'; fw = 'bold';
         } else if (isHead) {
             bg = dfaHalted ? (acc ? '#2e7d32' : '#c62828') : '#1565c0';
             fg = '#fff'; bord = '2px solid #333'; fw = 'bold';
