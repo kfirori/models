@@ -1194,6 +1194,10 @@ var dfaRunTimer = null;
 var dfaHalted = false;
 var dfaStepCount = 0;
 var dfaHistory = [];
+var dfaBlinkCell = -1;
+var dfaBlinkInterval = null;
+var dfaBlinkTimeout = null;
+var dfaBlinkOn = true;
 
 function drawUsing(c) {
     c.clearRect(0, 0, canvas.width, canvas.height);
@@ -2434,7 +2438,8 @@ function dfaInit() {
     dfaHalted = false;
     dfaHistory = [];
     dfaStopRun();
-    dfaInput = document.getElementById('dfa-input').value;
+    dfaStopBlink();
+    dfaInput = document.getElementById('dfa-tape-input').value;
     dfaPosition = 0;
     dfaState = dfaInitialState;
     tmCurrentNode = dfaNodeForState(dfaState);
@@ -2443,6 +2448,10 @@ function dfaInit() {
     dfaStepCount = 0;
     document.getElementById('dfa-step-counter').textContent = 'Steps: 0';
     document.getElementById('dfa-status').textContent = 'State: ' + dfaState;
+    var tapeInput = document.getElementById('dfa-tape-input');
+    if (tapeInput) tapeInput.style.display = 'none';
+    var tapeEl = document.getElementById('dfa-tape');
+    if (tapeEl) tapeEl.style.display = 'flex';
     dfaRender();
     draw();
 }
@@ -2482,10 +2491,8 @@ function dfaStep() {
     document.getElementById('dfa-step-counter').textContent = 'Steps: ' + dfaStepCount;
 
     tmCurrentNode = dfaNodeForState(dfaState);
-    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
-    tmCurrentLink = firedLink;
     var highlightMs = Math.round(700 / dfaGetSpeedHz());
-    tmLinkTimer = setTimeout(function() { tmCurrentLink = null; draw(); }, highlightMs);
+    dfaStartBlink(firedLink, dfaPosition - 1, highlightMs);
 
     if (dfaPosition >= dfaInput.length) {
         dfaHalted = true;
@@ -2505,6 +2512,7 @@ function dfaStep() {
 function dfaStepBack() {
     if (dfaHistory.length === 0) return;
     if (dfaRunning) dfaStopRun();
+    dfaStopBlink();
     var prev = dfaHistory.pop();
     dfaPosition = prev.position;
     dfaState = prev.state;
@@ -2545,42 +2553,73 @@ function dfaStopRun() {
     if (dfaRunTimer) { clearTimeout(dfaRunTimer); dfaRunTimer = null; }
 }
 
+function dfaStartBlink(link, cell, durationMs) {
+    if (dfaBlinkInterval) { clearInterval(dfaBlinkInterval); dfaBlinkInterval = null; }
+    if (dfaBlinkTimeout) { clearTimeout(dfaBlinkTimeout); dfaBlinkTimeout = null; }
+    dfaBlinkCell = cell;
+    dfaBlinkOn = true;
+    tmCurrentLink = link;
+    var blinkPeriod = 180;
+    dfaBlinkInterval = setInterval(function() {
+        dfaBlinkOn = !dfaBlinkOn;
+        tmCurrentLink = dfaBlinkOn ? link : null;
+        draw();
+        dfaRender();
+    }, blinkPeriod);
+    dfaBlinkTimeout = setTimeout(function() {
+        if (dfaBlinkInterval) { clearInterval(dfaBlinkInterval); dfaBlinkInterval = null; }
+        dfaBlinkTimeout = null;
+        dfaBlinkCell = -1;
+        dfaBlinkOn = true;
+        tmCurrentLink = null;
+        draw();
+        dfaRender();
+    }, durationMs);
+}
+
+function dfaStopBlink() {
+    if (dfaBlinkInterval) { clearInterval(dfaBlinkInterval); dfaBlinkInterval = null; }
+    if (dfaBlinkTimeout) { clearTimeout(dfaBlinkTimeout); dfaBlinkTimeout = null; }
+    dfaBlinkCell = -1;
+    dfaBlinkOn = true;
+    tmCurrentLink = null;
+}
+
 function dfaRender() {
     var tapeEl = document.getElementById('dfa-tape');
-    if (!tapeEl) return;
+    if (!tapeEl || tapeEl.style.display === 'none') return;
     var input = dfaInput || '';
     var len = input.length;
     var acc = dfaHalted && dfaAcceptStates.indexOf(dfaState) !== -1;
-    var rej = dfaHalted && !acc;
     var html = '';
 
     for (var i = 0; i < len; i++) {
         var ch = input[i];
         var isHead = (i === dfaPosition);
-        var bg, fg, bord;
-        if (isHead) {
+        var isBlinkCell = (dfaBlinkCell === i && dfaBlinkInterval !== null);
+        var bg, fg, bord, fw;
+        if (isBlinkCell) {
+            if (dfaBlinkOn) {
+                bg = '#ff8f00'; fg = '#fff'; bord = '2px solid #e65100'; fw = 'bold';
+            } else {
+                bg = '#e8e8e8'; fg = '#888'; bord = '1px solid #ccc'; fw = 'normal';
+            }
+        } else if (isHead) {
             bg = dfaHalted ? (acc ? '#2e7d32' : '#c62828') : '#1565c0';
-            fg = '#fff'; bord = '2px solid #333';
+            fg = '#fff'; bord = '2px solid #333'; fw = 'bold';
         } else if (i < dfaPosition) {
-            bg = '#e8e8e8'; fg = '#888'; bord = '1px solid #ccc';
+            bg = dfaHalted ? (acc ? '#c8e6c9' : '#ffcdd2') : '#e8e8e8';
+            fg = dfaHalted ? (acc ? '#1b5e20' : '#b71c1c') : '#888';
+            bord = '1px solid ' + (dfaHalted ? (acc ? '#a5d6a7' : '#ef9a9a') : '#ccc');
+            fw = 'normal';
         } else {
-            bg = '#f5f5f5'; fg = '#000'; bord = '1px solid #bbb';
+            bg = '#f5f5f5'; fg = '#000'; bord = '1px solid #bbb'; fw = 'normal';
         }
         html += '<div style="min-width:38px;height:44px;display:flex;align-items:center;justify-content:center;' +
             'background:' + bg + ';color:' + fg + ';border:' + bord + ';border-radius:4px;' +
-            'font-size:18px;font-family:monospace;font-weight:' + (isHead ? 'bold' : 'normal') + ';flex-shrink:0;">' +
+            'font-size:18px;font-family:monospace;font-weight:' + fw + ';flex-shrink:0;">' +
             ch + '</div>';
     }
-
-    // end-of-input marker ⊣
-    var isEndHead = (dfaPosition >= len);
-    var eBg = isEndHead ? (dfaHalted ? (acc ? '#2e7d32' : '#c62828') : '#1565c0') : '#f5f5f5';
-    var eFg = isEndHead ? '#fff' : '#bbb';
-    var eBord = isEndHead ? '2px solid #333' : '1px dashed #ccc';
-    html += '<div style="min-width:38px;height:44px;display:flex;align-items:center;justify-content:center;' +
-        'background:' + eBg + ';color:' + eFg + ';border:' + eBord + ';border-radius:4px;' +
-        'font-size:18px;font-family:monospace;font-weight:' + (isEndHead ? 'bold' : 'normal') + ';flex-shrink:0;">' +
-        '⊣</div>';
 
     tapeEl.innerHTML = html;
     var container = tapeEl.parentElement;

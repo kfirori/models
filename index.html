@@ -120,7 +120,7 @@
 
     function dfaClearSim() {
       if (typeof dfaRunning !== 'undefined' && dfaRunning) dfaStopRun();
-      document.getElementById('dfa-input').value = '';
+      if (typeof dfaStopBlink === 'function') dfaStopBlink();
       document.getElementById('dfa-status').textContent = '';
       document.getElementById('dfa-step-counter').textContent = 'Steps: 0';
       if (typeof tmLinkTimer !== 'undefined' && tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
@@ -129,7 +129,9 @@
       if (typeof tmInvalidLinks !== 'undefined') tmInvalidLinks = [];
       if (typeof dfaHistory !== 'undefined') dfaHistory = [];
       var tapeEl = document.getElementById('dfa-tape');
-      if (tapeEl) tapeEl.innerHTML = '';
+      if (tapeEl) { tapeEl.innerHTML = ''; tapeEl.style.display = 'none'; }
+      var tapeInput = document.getElementById('dfa-tape-input');
+      if (tapeInput) tapeInput.style.display = '';
       if (typeof draw === 'function') draw();
     }
 
@@ -242,7 +244,6 @@
         </div>
         <div id="dfa-sim-section" style="display:none">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-            <input id="dfa-input" type="text" placeholder="input word (e.g. abba), empty for ε" style="font-family:monospace;font-size:13px;width:280px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"/>
             <span style="display:flex;align-items:center;gap:10px;margin-left:auto;">
               <button onclick="dfaClearSim()" title="Clear input &amp; simulation" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#x2715;</button>
               <button onclick="dfaInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
@@ -259,7 +260,10 @@
           </div>
           <div id="dfa-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
           <div style="overflow-x:auto;">
-            <div id="dfa-tape" style="display:flex;gap:3px;padding:4px 0;min-height:50px;align-items:center;"></div>
+            <input id="dfa-tape-input" type="text" placeholder="type input word here, empty for ε"
+              style="font-family:monospace;font-size:18px;padding:8px 12px;border:1px solid #bbb;border-radius:4px;width:100%;box-sizing:border-box;background:#f9f9f9;height:52px;"
+              onkeydown="if(event.key==='Enter') dfaInit();"/>
+            <div id="dfa-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;flex-wrap:nowrap;"></div>
           </div>
         </div>
       </div>
