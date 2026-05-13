@@ -1198,6 +1198,22 @@ var dfaHistory = [];
 var dfaBlinkCell = -1;
 var dfaBlinkTimeout = null;
 
+var dpdaInput = '';
+var dpdaPosition = 0;
+var dpdaState = null;
+var dpdaTransitions = {};
+var dpdaInitialState = null;
+var dpdaAcceptStates = [];
+var dpdaRunning = false;
+var dpdaRunTimer = null;
+var dpdaHalted = false;
+var dpdaAccepted = false;
+var dpdaStepCount = 0;
+var dpdaHistory = [];
+var dpdaStack = [];
+var dpdaBlinkCell = -1;
+var dpdaBlinkTimeout = null;
+
 function drawUsing(c) {
     c.clearRect(0, 0, canvas.width, canvas.height);
     c.save();
@@ -2611,4 +2627,360 @@ function dfaRender() {
     tapeEl.innerHTML = html;
     var container = tapeEl.parentElement;
     if (container) container.scrollLeft = Math.max(0, dfaPosition * 41 - container.clientWidth / 2 + 19);
+}
+
+// ─── DPDA Simulator ──────────────────────────────────────────────────────────
+
+function dpdaGetSpeedHz() {
+    var val = parseInt(document.getElementById('dpda-speed').value);
+    return 0.25 * Math.pow(512, val / 100);
+}
+
+function dpdaStateName(text) {
+    return /^[a-zA-Z]/.test(text) ? text : 'q' + text;
+}
+
+function dpdaNodeForState(state) {
+    for (var i = 0; i < nodes.length; i++) {
+        if (dpdaStateName(nodes[i].text) === state) return nodes[i];
+    }
+    return null;
+}
+
+function dpdaFindLink(fromState, toState) {
+    for (var i = 0; i < links.length; i++) {
+        var lnk = links[i];
+        if (lnk instanceof Link && dpdaStateName(lnk.nodeA.text) === fromState && dpdaStateName(lnk.nodeB.text) === toState) return lnk;
+        if (lnk instanceof SelfLink && dpdaStateName(lnk.node.text) === fromState && fromState === toState) return lnk;
+    }
+    return null;
+}
+
+function dpdaGetStackTop() {
+    return dpdaStack.length === 0 ? '\\estack' : dpdaStack[dpdaStack.length - 1];
+}
+
+function dpdaSplitRules(text) {
+    return text.split(/\\n|  /).map(function(s) { return s.trim(); }).filter(Boolean);
+}
+
+// Parse one rule line: "a,X / push XY"  |  "a,X / pop"  |  "a,X / @e"
+function dpdaParseRule(ruleText) {
+    ruleText = ruleText.trim();
+    var slashIdx = ruleText.indexOf('/');
+    if (slashIdx === -1) return null;
+    var left = ruleText.substring(0, slashIdx).trim();
+    var opText = ruleText.substring(slashIdx + 1).trim();
+    var commaIdx = left.indexOf(',');
+    if (commaIdx === -1) return null;
+    var inputSym = left.substring(0, commaIdx).trim();
+    var stackSym = left.substring(commaIdx + 1).trim();
+    var opLower = opText.toLowerCase();
+    var op;
+    if (opLower === 'pop') {
+        op = { type: 'pop' };
+    } else if (opLower === '@e' || opLower === '\\epsilon' || opLower === 'ε' || opLower === '') {
+        op = { type: 'noop' };
+    } else if (opLower.startsWith('push ') && opText.length > 5) {
+        var pushChars = opText.substring(5).trim().split('').filter(function(c) { return c !== ' '; });
+        if (!pushChars.length) return null;
+        op = { type: 'push', symbols: pushChars };
+    } else {
+        return null;
+    }
+    return { inputSym: inputSym, stackSym: stackSym, op: op };
+}
+
+function dpdaApplyOp(op, matchedStackSym) {
+    var newStack = dpdaStack.slice();
+    if (op.type === 'noop') {
+        return newStack;
+    } else if (op.type === 'pop') {
+        if (matchedStackSym !== '\\estack') newStack.pop();
+        return newStack;
+    } else if (op.type === 'push') {
+        for (var i = 0; i < op.symbols.length; i++) newStack.push(op.symbols[i]);
+        return newStack;
+    }
+    return newStack;
+}
+
+function dpdaCompile() {
+    tmInvalidLinks = [];
+    var errors = [];
+    var startLinks = links.filter(function(l) { return l instanceof StartLink; });
+    if (startLinks.length === 0) {
+        errors.push('No initial state found — add a start arrow to the FSM.');
+    } else if (startLinks.length > 1) {
+        errors.push('More than one initial state found — only one start arrow is allowed.');
+    }
+    for (var i = 0; i < links.length; i++) {
+        var link = links[i];
+        if (!(link instanceof Link) && !(link instanceof SelfLink)) continue;
+        if (!link.text || !link.text.trim()) continue;
+        var lines = dpdaSplitRules(link.text);
+        var hasError = false;
+        for (var j = 0; j < lines.length; j++) {
+            var line = lines[j];
+            if (!line) continue;
+            var rule = dpdaParseRule(line);
+            if (!rule) { hasError = true; break; }
+            if (rule.inputSym.length !== 1) { hasError = true; break; }
+            if (rule.stackSym !== '\\estack' && rule.stackSym.length !== 1) { hasError = true; break; }
+        }
+        if (hasError) {
+            tmInvalidLinks.push(link);
+            var name = link instanceof SelfLink ? link.node.text : (link.nodeA.text + ' → ' + link.nodeB.text);
+            errors.push('Transition <b>' + name + '</b>: use <code>a,X / push XY</code>, <code>a,X / pop</code>, or <code>a,X / @e</code>');
+        }
+    }
+    return errors;
+}
+
+function parseDpdaProgram() {
+    var startLink = null;
+    for (var i = 0; i < links.length; i++) {
+        if (links[i] instanceof StartLink) { startLink = links[i]; break; }
+    }
+    var initialState = startLink ? dpdaStateName(startLink.node.text) : null;
+    var acceptStates = nodes.filter(function(n) { return n.isAcceptState; }).map(function(n) { return dpdaStateName(n.text); });
+    var transitions = {};
+    for (var i = 0; i < links.length; i++) {
+        var link = links[i];
+        var fromText, toText;
+        if (link instanceof Link) { fromText = link.nodeA.text; toText = link.nodeB.text; }
+        else if (link instanceof SelfLink) { fromText = link.node.text; toText = link.node.text; }
+        else continue;
+        if (!link.text || !link.text.trim()) continue;
+        var lines = dpdaSplitRules(link.text);
+        for (var j = 0; j < lines.length; j++) {
+            var line = lines[j];
+            if (!line) continue;
+            var rule = dpdaParseRule(line);
+            if (!rule) continue;
+            var key = dpdaStateName(fromText) + '|' + rule.inputSym + '|' + rule.stackSym;
+            transitions[key] = { to: dpdaStateName(toText), op: rule.op, link: link };
+        }
+    }
+    return { initialState: initialState, acceptStates: acceptStates, transitions: transitions };
+}
+
+function dpdaSaveHistory() {
+    dpdaHistory.push({ position: dpdaPosition, state: dpdaState, stepCount: dpdaStepCount, halted: dpdaHalted, accepted: dpdaAccepted, stack: dpdaStack.slice() });
+}
+
+function dpdaInit() {
+    var errors = dpdaCompile();
+    draw();
+    var statusEl = document.getElementById('dpda-status');
+    if (errors.length > 0) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
+        return;
+    }
+    var prog = parseDpdaProgram();
+    dpdaInitialState = prog.initialState;
+    dpdaAcceptStates = prog.acceptStates;
+    dpdaTransitions = prog.transitions;
+    dpdaHalted = false;
+    dpdaAccepted = false;
+    dpdaHistory = [];
+    dpdaStopRun();
+    dpdaStopBlink();
+    dpdaInput = document.getElementById('dpda-tape-input').value;
+    dpdaPosition = 0;
+    dpdaState = dpdaInitialState;
+    dpdaStack = [];
+    tmCurrentNode = dpdaNodeForState(dpdaState);
+    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+    tmCurrentLink = null;
+    dpdaStepCount = 0;
+    document.getElementById('dpda-step-counter').textContent = 'Steps: 0';
+    if (statusEl) statusEl.textContent = 'State: ' + dpdaState;
+    document.getElementById('dpda-tape-input').style.display = 'none';
+    document.getElementById('dpda-tape').style.display = 'flex';
+    var sc = document.getElementById('dpda-stack-container');
+    if (sc) sc.style.display = 'flex';
+    dpdaRender();
+    draw();
+}
+
+function dpdaStep() {
+    if (dpdaHalted || dpdaState === null) return;
+    dpdaSaveHistory();
+    var stackTop = dpdaGetStackTop();
+    var statusEl = document.getElementById('dpda-status');
+
+    if (dpdaPosition >= dpdaInput.length) {
+        dpdaHalted = true;
+        dpdaAccepted = dpdaAcceptStates.indexOf(dpdaState) !== -1;
+        if (statusEl) statusEl.innerHTML = dpdaAccepted
+            ? '<span style="color:#2e7d32;font-weight:bold;">&#10003; ACCEPTED</span>'
+            : '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> — state <b>' + dpdaState + '</b> is not an accept state';
+        dpdaStopRun();
+        dpdaRender();
+        draw();
+        return;
+    }
+
+    var ch = dpdaInput[dpdaPosition];
+    var trans = dpdaTransitions[dpdaState + '|' + ch + '|' + stackTop];
+    if (!trans) {
+        dpdaHalted = true;
+        dpdaAccepted = false;
+        var stackDisplay = stackTop === '\\estack' ? String.fromCharCode(10178) : stackTop;
+        if (statusEl) statusEl.innerHTML =
+            '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> — no transition from <b>' + dpdaState + '</b> on input <b>' + ch + '</b>, stack top <b>' + stackDisplay + '</b>';
+        dpdaStopRun();
+        dpdaRender();
+        draw();
+        return;
+    }
+
+    var firedLink = dpdaFindLink(dpdaState, trans.to);
+    dpdaStack = dpdaApplyOp(trans.op, stackTop);
+    dpdaState = trans.to;
+    dpdaPosition++;
+    dpdaStepCount++;
+    document.getElementById('dpda-step-counter').textContent = 'Steps: ' + dpdaStepCount;
+    tmCurrentNode = dpdaNodeForState(dpdaState);
+    var highlightMs = Math.round(700 / dpdaGetSpeedHz());
+    dpdaStartBlink(firedLink, dpdaPosition - 1, highlightMs);
+
+    if (dpdaPosition >= dpdaInput.length) {
+        dpdaHalted = true;
+        dpdaAccepted = dpdaAcceptStates.indexOf(dpdaState) !== -1;
+        if (statusEl) statusEl.innerHTML = dpdaAccepted
+            ? '<span style="color:#2e7d32;font-weight:bold;">&#10003; ACCEPTED</span>'
+            : '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> — state <b>' + dpdaState + '</b> is not an accept state';
+        dpdaStopRun();
+    } else {
+        if (statusEl) statusEl.textContent = 'State: ' + dpdaState;
+    }
+
+    dpdaRender();
+    draw();
+}
+
+function dpdaStepBack() {
+    if (dpdaHistory.length === 0) return;
+    if (dpdaRunning) dpdaStopRun();
+    dpdaStopBlink();
+    var prev = dpdaHistory.pop();
+    dpdaPosition = prev.position;
+    dpdaState = prev.state;
+    dpdaStepCount = prev.stepCount;
+    dpdaHalted = prev.halted;
+    dpdaAccepted = prev.accepted;
+    dpdaStack = prev.stack;
+    tmCurrentNode = dpdaNodeForState(dpdaState);
+    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+    tmCurrentLink = null;
+    document.getElementById('dpda-step-counter').textContent = 'Steps: ' + dpdaStepCount;
+    document.getElementById('dpda-status').textContent = 'State: ' + dpdaState;
+    dpdaRender();
+    draw();
+}
+
+function dpdaToggleRun() {
+    if (dpdaRunning) {
+        dpdaStopRun();
+    } else {
+        if (dpdaHalted) return;
+        dpdaRunning = true;
+        document.getElementById('dpda-run-btn').textContent = '⏸';
+        dpdaRunLoop();
+    }
+}
+
+function dpdaRunLoop() {
+    if (!dpdaRunning || dpdaHalted) { dpdaStopRun(); return; }
+    dpdaStep();
+    if (!dpdaHalted) dpdaRunTimer = setTimeout(dpdaRunLoop, Math.round(1000 / dpdaGetSpeedHz()));
+}
+
+function dpdaStopRun() {
+    dpdaRunning = false;
+    var btn = document.getElementById('dpda-run-btn');
+    if (btn) btn.textContent = '►';
+    if (dpdaRunTimer) { clearTimeout(dpdaRunTimer); dpdaRunTimer = null; }
+}
+
+function dpdaStartBlink(link, cell, durationMs) {
+    if (dpdaBlinkTimeout) { clearTimeout(dpdaBlinkTimeout); dpdaBlinkTimeout = null; }
+    dpdaBlinkCell = cell;
+    tmCurrentLink = link;
+    draw();
+    dpdaRender();
+    dpdaBlinkTimeout = setTimeout(function() {
+        dpdaBlinkTimeout = null;
+        dpdaBlinkCell = -1;
+        tmCurrentLink = null;
+        draw();
+        dpdaRender();
+    }, durationMs);
+}
+
+function dpdaStopBlink() {
+    if (dpdaBlinkTimeout) { clearTimeout(dpdaBlinkTimeout); dpdaBlinkTimeout = null; }
+    dpdaBlinkCell = -1;
+    tmCurrentLink = null;
+}
+
+function dpdaRender() {
+    var tapeEl = document.getElementById('dpda-tape');
+    if (!tapeEl || tapeEl.style.display === 'none') return;
+    var input = dpdaInput || '';
+    var len = input.length;
+    var acc = dpdaHalted && dpdaAccepted;
+    var html = '';
+    for (var i = 0; i < len; i++) {
+        var ch = input[i];
+        var isBlinkCell = (dpdaBlinkCell === i);
+        var isHead = (i === dpdaPosition) && dpdaBlinkCell === -1;
+        var bg, fg, bord, fw;
+        if (isBlinkCell) {
+            bg = '#ff8f00'; fg = '#fff'; bord = '2px solid #e65100'; fw = 'bold';
+        } else if (isHead) {
+            bg = dpdaHalted ? (acc ? '#2e7d32' : '#c62828') : '#1565c0';
+            fg = '#fff'; bord = '2px solid #333'; fw = 'bold';
+        } else if (i < dpdaPosition) {
+            bg = dpdaHalted ? (acc ? '#c8e6c9' : '#ffcdd2') : '#e8e8e8';
+            fg = dpdaHalted ? (acc ? '#1b5e20' : '#b71c1c') : '#888';
+            bord = '1px solid ' + (dpdaHalted ? (acc ? '#a5d6a7' : '#ef9a9a') : '#ccc');
+            fw = 'normal';
+        } else {
+            bg = '#f5f5f5'; fg = '#000'; bord = '1px solid #bbb'; fw = 'normal';
+        }
+        html += '<div style="min-width:38px;height:44px;display:flex;align-items:center;justify-content:center;' +
+            'background:' + bg + ';color:' + fg + ';border:' + bord + ';border-radius:4px;' +
+            'font-size:18px;font-family:monospace;font-weight:' + fw + ';flex-shrink:0;">' + ch + '</div>';
+    }
+    tapeEl.innerHTML = html;
+    var container = tapeEl.parentElement;
+    if (container) container.scrollLeft = Math.max(0, dpdaPosition * 41 - container.clientWidth / 2 + 19);
+    dpdaRenderStack();
+}
+
+function dpdaRenderStack() {
+    var stackEl = document.getElementById('dpda-stack');
+    if (!stackEl) return;
+    var emptyChar = String.fromCharCode(10178);
+    var html = '';
+    if (dpdaStack.length === 0) {
+        html = '<div style="min-width:44px;height:40px;display:flex;align-items:center;justify-content:center;' +
+            'background:#f0f0f0;color:#bbb;border:1px dashed #ccc;border-radius:4px;' +
+            'font-size:18px;font-family:monospace;" title="empty stack">' + emptyChar + '</div>';
+    } else {
+        for (var i = dpdaStack.length - 1; i >= 0; i--) {
+            var isTop = (i === dpdaStack.length - 1);
+            html += '<div style="min-width:44px;height:40px;display:flex;align-items:center;justify-content:center;' +
+                'background:' + (isTop ? '#1565c0' : '#f5f5f5') + ';' +
+                'color:' + (isTop ? '#fff' : '#333') + ';' +
+                'border:' + (isTop ? '2px solid #0d47a1' : '1px solid #bbb') + ';' +
+                'border-radius:4px;font-size:18px;font-family:monospace;' +
+                'font-weight:' + (isTop ? 'bold' : 'normal') + ';">' +
+                dpdaStack[i] + '</div>';
+        }
+    }
+    stackEl.innerHTML = html;
 }

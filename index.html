@@ -152,17 +152,16 @@
 
     function setSimMode(mode) {
       if (typeof simMode !== 'undefined') simMode = mode;
-      var isTM = mode === 'tm';
-      document.getElementById('tm-sim-section').style.display = isTM ? '' : 'none';
-      document.getElementById('dfa-sim-section').style.display = isTM ? 'none' : '';
-      var tmBtn = document.getElementById('mode-tm-btn');
-      var dfaBtn = document.getElementById('mode-dfa-btn');
-      tmBtn.style.background = isTM ? '#d0e4f7' : '#f0f0f0';
-      tmBtn.style.fontWeight = isTM ? 'bold' : 'normal';
-      dfaBtn.style.background = isTM ? '#f0f0f0' : '#d0e4f7';
-      dfaBtn.style.fontWeight = isTM ? 'normal' : 'bold';
-      if (!isTM && typeof dfaRunning !== 'undefined' && dfaRunning) dfaStopRun();
-      if (isTM && typeof tmRunning !== 'undefined' && tmRunning) tmStopRun();
+      document.getElementById('tm-sim-section').style.display = mode === 'tm' ? '' : 'none';
+      document.getElementById('dfa-sim-section').style.display = mode === 'dfa' ? '' : 'none';
+      document.getElementById('dpda-sim-section').style.display = mode === 'dpda' ? '' : 'none';
+      ['tm', 'dfa', 'dpda'].forEach(function(m) {
+        var btn = document.getElementById('mode-' + m + '-btn');
+        if (btn) { btn.style.background = m === mode ? '#d0e4f7' : '#f0f0f0'; btn.style.fontWeight = m === mode ? 'bold' : 'normal'; }
+      });
+      if (mode !== 'dfa' && typeof dfaRunning !== 'undefined' && dfaRunning) dfaStopRun();
+      if (mode !== 'dpda' && typeof dpdaRunning !== 'undefined' && dpdaRunning) dpdaStopRun();
+      if (mode !== 'tm' && typeof tmRunning !== 'undefined' && tmRunning) tmStopRun();
       if (typeof tmCurrentNode !== 'undefined') tmCurrentNode = null;
       if (typeof tmCurrentLink !== 'undefined') tmCurrentLink = null;
       if (typeof tmInvalidLinks !== 'undefined') tmInvalidLinks = [];
@@ -172,7 +171,43 @@
 
     function simInit() {
       if (typeof simMode !== 'undefined' && simMode === 'dfa') dfaInit();
+      else if (typeof simMode !== 'undefined' && simMode === 'dpda') dpdaInit();
       else tmInit();
+    }
+
+    function dpdaClearSim() {
+      if (typeof dpdaRunning !== 'undefined' && dpdaRunning) dpdaStopRun();
+      if (typeof dpdaStopBlink === 'function') dpdaStopBlink();
+      document.getElementById('dpda-status').textContent = '';
+      document.getElementById('dpda-step-counter').textContent = 'Steps: 0';
+      if (typeof tmLinkTimer !== 'undefined' && tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+      if (typeof tmCurrentNode !== 'undefined') tmCurrentNode = null;
+      if (typeof tmCurrentLink !== 'undefined') tmCurrentLink = null;
+      if (typeof tmInvalidLinks !== 'undefined') tmInvalidLinks = [];
+      if (typeof dpdaHistory !== 'undefined') dpdaHistory = [];
+      if (typeof dpdaStack !== 'undefined') dpdaStack = [];
+      var tapeEl = document.getElementById('dpda-tape');
+      if (tapeEl) { tapeEl.innerHTML = ''; tapeEl.style.display = 'none'; }
+      var tapeInput = document.getElementById('dpda-tape-input');
+      if (tapeInput) tapeInput.style.display = '';
+      var sc = document.getElementById('dpda-stack-container');
+      if (sc) sc.style.display = 'none';
+      if (typeof draw === 'function') draw();
+    }
+
+    function dpdaShowSpeedTooltip(slider) {
+      var tooltip = document.getElementById('dpda-speed-tooltip');
+      if (!tooltip) return;
+      var pct = (slider.value - slider.min) / (slider.max - slider.min);
+      tooltip.style.left = (pct * slider.offsetWidth) + 'px';
+      var hz = typeof dpdaGetSpeedHz === 'function' ? dpdaGetSpeedHz() : 1;
+      tooltip.textContent = hz < 1 ? hz.toFixed(2) + ' Hz' : hz < 10 ? hz.toFixed(1) + ' Hz' : Math.round(hz) + ' Hz';
+      tooltip.style.display = 'block';
+    }
+
+    function dpdaHideSpeedTooltip() {
+      var tooltip = document.getElementById('dpda-speed-tooltip');
+      if (tooltip) tooltip.style.display = 'none';
     }
 
     if (typeof btoa == "undefined") {
@@ -214,6 +249,7 @@
         <div style="display:flex;gap:6px;margin-bottom:14px;">
           <button id="mode-tm-btn" onclick="setSimMode('tm')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:12pt;font-weight:bold;">Turing Machine</button>
           <button id="mode-dfa-btn" onclick="setSimMode('dfa')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:12pt;font-weight:normal;">DFA</button>
+          <button id="mode-dpda-btn" onclick="setSimMode('dpda')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:12pt;font-weight:normal;">DPDA</button>
         </div>
         <div id="tm-sim-section">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
@@ -266,6 +302,36 @@
             <div id="dfa-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;flex-wrap:nowrap;"></div>
           </div>
         </div>
+        <div id="dpda-sim-section" style="display:none">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+            <span style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+              <button onclick="dpdaClearSim()" title="Clear input &amp; simulation" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#x2715;</button>
+              <button onclick="dpdaInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
+              <button onclick="dpdaStepBack()" title="Step back" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
+              <button onclick="dpdaStep()" title="Step" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
+              <button id="dpda-run-btn" onclick="dpdaToggleRun()" title="Run" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
+              <label>Speed:&nbsp;<span style="position:relative;display:inline-block;vertical-align:middle;">
+                <input id="dpda-speed" type="range" min="0" max="100" value="50" style="width:70px;"
+                  oninput="dpdaShowSpeedTooltip(this)" onmouseup="dpdaHideSpeedTooltip()" ontouchend="dpdaHideSpeedTooltip()"/>
+                <span id="dpda-speed-tooltip" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:#333;color:#fff;font-size:11px;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);"></span>
+              </span></label>
+              <span id="dpda-step-counter" style="font-family:monospace;font-size:13px;">Steps: 0</span>
+            </span>
+          </div>
+          <div id="dpda-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="overflow-x:auto;flex:1;min-width:0;">
+              <input id="dpda-tape-input" type="text" placeholder="type input word here, empty for ε"
+                style="font-family:monospace;font-size:18px;padding:8px 12px;border:1px solid #bbb;border-radius:4px;width:100%;box-sizing:border-box;background:#f9f9f9;height:52px;"
+                onkeydown="if(event.key==='Enter') dpdaInit();"/>
+              <div id="dpda-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;flex-wrap:nowrap;"></div>
+            </div>
+            <div id="dpda-stack-container" style="display:none;flex-direction:column;align-items:center;gap:2px;min-width:52px;">
+              <div style="font-size:11px;color:#888;font-family:monospace;white-space:nowrap;">stack ↑top</div>
+              <div id="dpda-stack" style="display:flex;flex-direction:column;align-items:center;gap:2px;"></div>
+            </div>
+          </div>
+        </div>
       </div>
       <div>Created by <a href="https://madebyevan.com/">Evan Wallace</a> in 2010, thankfully modified by Moritz Liedtke
         in
@@ -311,6 +377,15 @@
             </li>
           </ul>
 
+          <ul>
+            <li>
+              <b>DPDA transitions</b> — one rule per line on a link label (press Enter for a new line):<br>
+              <code>a,X / push XY</code> — read <i>a</i>, pop <i>X</i>, push X then Y (Y on top)<br>
+              <code>a,X / pop</code> — read <i>a</i>, pop <i>X</i>, push nothing<br>
+              <code>a,X / @e</code> — read <i>a</i>, leave stack unchanged<br>
+              Use <code>\estack</code> as the stack symbol to match an empty stack.
+            </li>
+          </ul>
           <ul>
             <li>
               <b>Subscripts:</b> all characters directly following an underscore (without white spaces) will be
