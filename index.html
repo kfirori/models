@@ -161,6 +161,7 @@
       });
       if (mode !== 'dfa' && typeof dfaRunning !== 'undefined' && dfaRunning) dfaStopRun();
       if (mode !== 'dpda' && typeof dpdaRunning !== 'undefined' && dpdaRunning) dpdaStopRun();
+      if (mode !== 'dpda') { var _sf = document.getElementById('dpda-stack-float'); if (_sf) _sf.style.display = 'none'; }
       if (mode !== 'tm' && typeof tmRunning !== 'undefined' && tmRunning) tmStopRun();
       if (typeof tmCurrentNode !== 'undefined') tmCurrentNode = null;
       if (typeof tmCurrentLink !== 'undefined') tmCurrentLink = null;
@@ -190,7 +191,7 @@
       if (tapeEl) { tapeEl.innerHTML = ''; tapeEl.style.display = 'none'; }
       var tapeInput = document.getElementById('dpda-tape-input');
       if (tapeInput) tapeInput.style.display = '';
-      var sc = document.getElementById('dpda-stack-container');
+      var sc = document.getElementById('dpda-stack-float');
       if (sc) sc.style.display = 'none';
       if (typeof draw === 'function') draw();
     }
@@ -319,17 +320,11 @@
             </span>
           </div>
           <div id="dpda-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
-          <div style="display:flex;gap:12px;align-items:flex-start;">
-            <div style="overflow-x:auto;flex:1;min-width:0;">
-              <input id="dpda-tape-input" type="text" placeholder="type input word here, empty for ε"
-                style="font-family:monospace;font-size:18px;padding:8px 12px;border:1px solid #bbb;border-radius:4px;width:100%;box-sizing:border-box;background:#f9f9f9;height:52px;"
-                onkeydown="if(event.key==='Enter') dpdaInit();"/>
-              <div id="dpda-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;flex-wrap:nowrap;"></div>
-            </div>
-            <div id="dpda-stack-container" style="display:none;flex-direction:column;align-items:center;gap:2px;min-width:52px;">
-              <div style="font-size:11px;color:#888;font-family:monospace;white-space:nowrap;">stack ↑top</div>
-              <div id="dpda-stack" style="display:flex;flex-direction:column;align-items:center;gap:2px;"></div>
-            </div>
+          <div style="overflow-x:auto;">
+            <input id="dpda-tape-input" type="text" placeholder="type input word here, empty for ε"
+              style="font-family:monospace;font-size:18px;padding:8px 12px;border:1px solid #bbb;border-radius:4px;width:100%;box-sizing:border-box;background:#f9f9f9;height:52px;"
+              onkeydown="if(event.key==='Enter') dpdaInit();"/>
+            <div id="dpda-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;flex-wrap:nowrap;"></div>
           </div>
         </div>
       </div>
@@ -409,6 +404,32 @@
     </div>
   </div>
 
+<div id="dpda-stack-float" onmousedown="dpdaDragStart(event)"
+  style="display:none;position:fixed;top:140px;right:32px;background:white;border-radius:12px;padding:8px 12px 10px;z-index:200;box-shadow:0 2px 14px rgba(0,0,0,0.18);cursor:move;user-select:none;min-width:52px;">
+  <div style="font-size:11px;color:#aaa;font-family:monospace;text-align:center;margin-bottom:6px;pointer-events:none;letter-spacing:0.04em;">stack</div>
+  <div id="dpda-stack" style="display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;"></div>
+  <div style="font-size:10px;color:#ccc;font-family:monospace;text-align:center;margin-top:6px;pointer-events:none;">↓ bottom</div>
+</div>
+
+<script>
+  var _dpdaDrag = null;
+  function dpdaDragStart(e) {
+    var el = document.getElementById('dpda-stack-float');
+    var rect = el.getBoundingClientRect();
+    el.style.right = 'auto';
+    el.style.left = rect.left + 'px';
+    el.style.top = rect.top + 'px';
+    _dpdaDrag = { el: el, ox: e.clientX - rect.left, oy: e.clientY - rect.top };
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  document.addEventListener('mousemove', function(e) {
+    if (!_dpdaDrag) return;
+    _dpdaDrag.el.style.left = (e.clientX - _dpdaDrag.ox) + 'px';
+    _dpdaDrag.el.style.top = (e.clientY - _dpdaDrag.oy) + 'px';
+  });
+  document.addEventListener('mouseup', function() { _dpdaDrag = null; });
+</script>
 </body>
 
 </html>

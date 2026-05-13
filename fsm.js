@@ -2798,8 +2798,8 @@ function dpdaInit() {
     if (statusEl) statusEl.textContent = 'State: ' + dpdaState;
     document.getElementById('dpda-tape-input').style.display = 'none';
     document.getElementById('dpda-tape').style.display = 'flex';
-    var sc = document.getElementById('dpda-stack-container');
-    if (sc) sc.style.display = 'flex';
+    var sc = document.getElementById('dpda-stack-float');
+    if (sc) sc.style.display = 'block';
     dpdaRender();
     draw();
 }
