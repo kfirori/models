@@ -170,12 +170,6 @@
       if (typeof draw === 'function') draw();
     }
 
-    function simInit() {
-      if (typeof simMode !== 'undefined' && simMode === 'dfa') dfaInit();
-      else if (typeof simMode !== 'undefined' && simMode === 'dpda') dpdaInit();
-      else tmInit();
-    }
-
     function dpdaClearSim() {
       if (typeof dpdaRunning !== 'undefined' && dpdaRunning) dpdaStopRun();
       if (typeof dpdaStopBlink === 'function') dpdaStopBlink();
@@ -338,8 +332,6 @@
           <a href="javascript:saveAsLaTeX()">LaTeX</a> |
           <a href="javascript:saveAsJson()">Save As Json</a> |
           <a href="javascript:loadFromJson()">Load Json</a> |
-          <a href="javascript:toTuring()">Turing</a> |
-          <a href="javascript:simInit()">Simulate</a> |
           <a href="javascript:saveAsLaTeXForObsidian()">LaTeX for Obsidian</a>
 
 

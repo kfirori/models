@@ -1155,7 +1155,6 @@ var nodeRadius = 30;
 var nodes = [];
 var links = [];
 
-var cursorVisible = true;
 var snapToPadding = 6; // pixels
 var hitTargetPadding = 6; // pixels
 var selectedObject = null; // either a Link or a Node
@@ -1387,7 +1386,6 @@ window.onload = function () {
                     selectedNodes = [];
                 }
                 movingObject = true;
-                deltaMouseX = deltaMouseY = 0;
                 lastDragMouse = mouse;
                 if (selectedObject.setMouseStart) {
                     selectedObject.setMouseStart(mouse.x, mouse.y);
@@ -2348,7 +2346,7 @@ function generateRandomConfetti() {
         {
             angle: 90,
             origin: { x: randomInRange(0.1, 0.9), y: 1.2 },
-            ...defaultSeadttings,
+            ...defaultSettings,
         },
     ][Math.floor(Math.random() * 3)];
 }
@@ -2643,15 +2641,6 @@ function dpdaStateName(text) {
 function dpdaNodeForState(state) {
     for (var i = 0; i < nodes.length; i++) {
         if (dpdaStateName(nodes[i].text) === state) return nodes[i];
-    }
-    return null;
-}
-
-function dpdaFindLink(fromState, toState) {
-    for (var i = 0; i < links.length; i++) {
-        var lnk = links[i];
-        if (lnk instanceof Link && dpdaStateName(lnk.nodeA.text) === fromState && dpdaStateName(lnk.nodeB.text) === toState) return lnk;
-        if (lnk instanceof SelfLink && dpdaStateName(lnk.node.text) === fromState && fromState === toState) return lnk;
     }
     return null;
 }
