@@ -2737,7 +2737,7 @@ function dpdaCompile() {
     return errors;
 }
 
-function parseDpdaProgram() {
+function parseDpdaProgram(errors) {
     var startLink = null;
     for (var i = 0; i < links.length; i++) {
         if (links[i] instanceof StartLink) { startLink = links[i]; break; }
@@ -2759,6 +2759,11 @@ function parseDpdaProgram() {
             var rule = dpdaParseRule(line);
             if (!rule) continue;
             var key = dpdaStateName(fromText) + '|' + rule.inputSym + '|' + rule.stackSym;
+            if (transitions[key] && errors) {
+                var stackLabel = rule.stackSym === '\\estack' ? String.fromCharCode(10178) : rule.stackSym;
+                errors.push('Duplicate transition in state <b>' + fromText + '</b> on input <b>' + rule.inputSym + '</b>, stack top <b>' + stackLabel + '</b>');
+                tmInvalidLinks.push(link);
+            }
             transitions[key] = { to: dpdaStateName(toText), op: rule.op, link: link };
         }
     }
@@ -2771,13 +2776,19 @@ function dpdaSaveHistory() {
 
 function dpdaInit() {
     var errors = dpdaCompile();
+    dpdaStopBlink();
     draw();
     var statusEl = document.getElementById('dpda-status');
     if (errors.length > 0) {
         if (statusEl) statusEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
         return;
     }
-    var prog = parseDpdaProgram();
+    var prog = parseDpdaProgram(errors);
+    if (errors.length > 0) {
+        draw();
+        if (statusEl) statusEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
+        return;
+    }
     dpdaInitialState = prog.initialState;
     dpdaAcceptStates = prog.acceptStates;
     dpdaTransitions = prog.transitions;
@@ -2836,7 +2847,7 @@ function dpdaStep() {
         return;
     }
 
-    var firedLink = dpdaFindLink(dpdaState, trans.to);
+    var firedLink = trans.link;
     dpdaStack = dpdaApplyOp(trans.op, stackTop);
     dpdaState = trans.to;
     dpdaPosition++;
