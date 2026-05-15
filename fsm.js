@@ -1167,7 +1167,7 @@ var tmTape = [];
 var tmHead = 0;
 var tmTransitions = {};
 var tmInitialState = null;
-var tmAcceptState = null;
+var tmAcceptStates = [];
 var tmRunning = false;
 var tmRunTimer = null;
 var tmHalted = false;
@@ -1929,16 +1929,12 @@ function toTuring() {
 
 function parseTuringProgram() {
     var startLink = null;
-    var acceptNode = null;
     for (var i = 0; i < links.length; i++) {
         if (links[i] instanceof StartLink) { startLink = links[i]; break; }
     }
-    for (var i = 0; i < nodes.length; i++) {
-        if (nodes[i].isAcceptState) { acceptNode = nodes[i]; break; }
-    }
     var transitions = {};
     var initialState = startLink ? tmStateName(startLink.node.text) : null;
-    var acceptState = acceptNode ? tmStateName(acceptNode.text) : null;
+    var acceptStates = nodes.filter(function(n) { return n.isAcceptState; }).map(function(n) { return tmStateName(n.text); });
     for (var i = 0; i < links.length; i++) {
         var link = links[i];
         var fromText, toText;
@@ -1965,7 +1961,7 @@ function parseTuringProgram() {
             }
         }
     }
-    return { initialState: initialState, acceptState: acceptState, transitions: transitions };
+    return { initialState: initialState, acceptStates: acceptStates, transitions: transitions };
 }
 
 function tmSaveHistory() {
@@ -2112,7 +2108,7 @@ function tmInit() {
     }
     var prog = parseTuringProgram();
     tmInitialState = prog.initialState;
-    tmAcceptState = prog.acceptState;
+    tmAcceptStates = prog.acceptStates;
     tmTransitions = prog.transitions;
     var writesDollar = Object.keys(tmTransitions).some(function(k) { return tmTransitions[k].write === '$'; });
     var modeRadio = document.querySelector('input[name="tm-input-mode"][value="' + (writesDollar ? 'args' : 'input') + '"]');
@@ -2147,7 +2143,7 @@ function tmStep() {
 
     if (!trans) {
         tmHalted = true;
-        var accepted = (tmState === tmAcceptState);
+        var accepted = (tmAcceptStates.indexOf(tmState) !== -1);
         document.getElementById('tm-status').innerHTML = accepted
             ? '<span style="color:#2e7d32;font-weight:bold;">&#10003; ACCEPTED</span>'
             : '<span style="color:#c62828;font-weight:bold;">&#10007; REJECTED</span> &mdash; no transition for state <b>' + tmState + '</b>, read <b>' + (cell === '_' ? '&#8710;' : cell) + '</b>';
@@ -2193,7 +2189,7 @@ function tmStep() {
     tmState = trans.to;
     tmCurrentNode = tmNodeForState(tmState);
 
-    if (tmAcceptState && tmState === tmAcceptState) {
+    if (tmAcceptStates.length > 0 && tmAcceptStates.indexOf(tmState) !== -1) {
         tmHalted = true;
         document.getElementById('tm-status').innerHTML =
             '<span style="color:#2e7d32;font-weight:bold;">&#10003; ACCEPTED</span>';
@@ -2239,7 +2235,7 @@ function tmRender() {
         var isHead = (i === tmHead);
         var bg, fg, bord;
         if (isHead) {
-            bg = tmHalted ? (tmState === tmAcceptState ? '#2e7d32' : '#c62828') : '#1565c0';
+            bg = tmHalted ? (tmAcceptStates.indexOf(tmState) !== -1 ? '#2e7d32' : '#c62828') : '#1565c0';
             fg = '#fff';
             bord = '2px solid #333';
         } else {
