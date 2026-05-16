@@ -205,6 +205,28 @@
       if (tooltip) tooltip.style.display = 'none';
     }
 
+    function toggleSimPanel() {
+      var contentEl = document.getElementById('sim-panel-content');
+      var toggleBtn = document.getElementById('sim-toggle-btn');
+      var panelEl = document.getElementById('sim-panel');
+      var open = contentEl.style.display !== 'none';
+      if (open) {
+        var panelBefore = panelEl.getBoundingClientRect().height;
+        contentEl.style.display = 'none';
+        var recovered = panelBefore - panelEl.getBoundingClientRect().height;
+        toggleBtn.innerHTML = '&#9660;';
+        toggleBtn.title = 'Expand';
+        if (typeof canvas !== 'undefined' && canvas) {
+          canvas.style.height = (canvas.getBoundingClientRect().height + recovered) + 'px';
+        }
+      } else {
+        if (typeof canvas !== 'undefined' && canvas) canvas.style.height = '';
+        contentEl.style.display = '';
+        toggleBtn.innerHTML = '&#9650;';
+        toggleBtn.title = 'Collapse';
+      }
+    }
+
     if (typeof btoa == "undefined") {
       function btoa(str) {
         var chars =
@@ -239,11 +261,13 @@
           element</span>
       </canvas>
       <div id="sim-panel" style="background:white;border-radius:20px;padding:20px;max-width:1200px;width:100%;box-sizing:border-box;">
-        <div style="display:flex;gap:6px;margin-bottom:14px;">
+        <div style="display:flex;gap:6px;align-items:center;">
           <button id="mode-tm-btn" onclick="setSimMode('tm')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:12pt;font-weight:bold;">Turing Machine</button>
           <button id="mode-dfa-btn" onclick="setSimMode('dfa')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:12pt;font-weight:normal;">DFA</button>
           <button id="mode-dpda-btn" onclick="setSimMode('dpda')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:12pt;font-weight:normal;">DPDA</button>
+          <button id="sim-toggle-btn" onclick="toggleSimPanel()" title="Collapse" style="margin-left:auto;padding:2px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:14px;">&#9650;</button>
         </div>
+        <div id="sim-panel-content" style="margin-top:14px;">
         <div id="tm-sim-section">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
             <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -318,6 +342,7 @@
               onkeydown="if(event.key==='Enter') dpdaInit();"/>
             <div id="dpda-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;flex-wrap:nowrap;"></div>
           </div>
+        </div>
         </div>
       </div>
       <div>Created by <a href="https://madebyevan.com/">Evan Wallace</a> in 2010, thankfully modified by Moritz Liedtke
