@@ -1285,6 +1285,61 @@ function clearCanvas() {
     saveBackup();
 }
 
+function renumberStates() {
+    if (nodes.length === 0) return;
+
+    var startNode = null;
+    for (var i = 0; i < links.length; i++) {
+        if (links[i] instanceof StartLink) { startNode = links[i].node; break; }
+    }
+
+    var adj = [];
+    for (var i = 0; i < nodes.length; i++) adj.push([]);
+    for (var i = 0; i < links.length; i++) {
+        var link = links[i];
+        if (link instanceof Link) {
+            var fromIdx = nodes.indexOf(link.nodeA);
+            var toIdx = nodes.indexOf(link.nodeB);
+            if (fromIdx !== -1 && toIdx !== -1 && adj[fromIdx].indexOf(toIdx) === -1) {
+                adj[fromIdx].push(toIdx);
+            }
+        }
+    }
+
+    var order = [];
+    var inOrder = [];
+    for (var i = 0; i < nodes.length; i++) inOrder.push(false);
+
+    if (startNode) {
+        var startIdx = nodes.indexOf(startNode);
+        var queue = [startIdx];
+        inOrder[startIdx] = true;
+        while (queue.length > 0) {
+            var cur = queue.shift();
+            order.push(cur);
+            var neighbors = adj[cur];
+            for (var j = 0; j < neighbors.length; j++) {
+                if (!inOrder[neighbors[j]]) {
+                    inOrder[neighbors[j]] = true;
+                    queue.push(neighbors[j]);
+                }
+            }
+        }
+    }
+
+    for (var i = 0; i < nodes.length; i++) {
+        if (!inOrder[i]) order.push(i);
+    }
+
+    var allPrefixed = nodes.every(function(n) { return /^q_\d+$/.test(n.text); });
+
+    for (var i = 0; i < order.length; i++) {
+        nodes[order[i]].text = allPrefixed ? String(i) : 'q_' + i;
+    }
+
+    draw();
+}
+
 // Adjust link.perpendicularPart so the arc clears any node that lies on its straight path.
 // Uses the parabolic approximation: arc offset at t ≈ p × 4t(1-t).
 function autoAdjustLinkCurve(link) {

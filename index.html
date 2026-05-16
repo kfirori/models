@@ -343,6 +343,7 @@
           <label for="nodeRadiusSlider">Node radius: <span id="nodeRadiusValue">30</span></label><br>
           <input id="nodeRadiusSlider" type="range" min="15" max="60" value="30" style="width:100%"
             oninput="nodeRadius = +this.value; document.getElementById('nodeRadiusValue').textContent = this.value; draw();">
+          <button onclick="renumberStates()" style="margin-top:6px;width:100%;padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:11pt;">Renumber</button>
         </div>
         <textarea id="output"></textarea>
       </div>
