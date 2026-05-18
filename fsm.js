@@ -52,7 +52,7 @@ function ExportAsLaTeX(isObsidian) {
                 "\n" +
                 "\\begin{center}\n" +
                 "\\begin{tikzpicture}[scale=0.2]\n" +
-                "\\tikzstyle{every node}+=[inner sep=0pt]\n" +
+                "\\tikzstyle{now gevery node}+=[inner sep=0pt]\n" +
                 this._texData +
                 "\\end{tikzpicture}\n" +
                 "\\end{center}\n" +
@@ -1418,14 +1418,6 @@ window.onload = function () {
     canvas = document.getElementById("canvas");
     restoreBackup();
     draw();
-
-    var jsonBtn = document.querySelector('button[onclick="saveAsJson()"]');
-    if (jsonBtn) {
-        var turingBtn = document.createElement("button");
-        turingBtn.textContent = "toTuring";
-        turingBtn.onclick = toTuring;
-        jsonBtn.insertAdjacentElement("afterend", turingBtn);
-    }
 
     canvas.onmousedown = function (e) {
         var mouse = crossBrowserRelativeMousePos(e);

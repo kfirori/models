@@ -66,6 +66,50 @@
       gap: 10px;
     }
 
+    .tab-container {
+      background: white;
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .tab-header {
+      display: flex;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 10px 20px 0;
+    }
+
+    .tab-btn {
+      padding: 8px 20px;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      background: none;
+      font-family: inherit;
+      font-size: 11pt;
+      font-weight: normal;
+      color: #666;
+      margin-bottom: -1px;
+    }
+
+    .tab-btn.active {
+      border-bottom: 3px solid #4a90d9;
+      font-weight: bold;
+      color: #222;
+    }
+
+    .tab-pane {
+      display: none;
+      padding: 20px;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tab-pane.active {
+      display: flex;
+    }
+
     .error {
       display: block;
       color: red;
@@ -227,6 +271,71 @@
       }
     }
 
+    function spinToClipboard() {
+      if (typeof nodes === 'undefined' || nodes.length === 0) return;
+      var cvs = document.getElementById('canvas');
+      var ctx = cvs.getContext('2d');
+      var original = ctx.getImageData(0, 0, cvs.width, cvs.height);
+      var data = original.data;
+      var minX = cvs.width, minY = cvs.height, maxX = 0, maxY = 0;
+      for (var y = 0; y < cvs.height; y++) {
+        for (var x = 0; x < cvs.width; x++) {
+          if (data[(y * cvs.width + x) * 4 + 3] > 10) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (minX > maxX || minY > maxY) return;
+      var padding = 20;
+      var sx = Math.max(0, minX - padding);
+      var sy = Math.max(0, minY - padding);
+      var sw = Math.min(cvs.width, maxX + padding + 1) - sx;
+      var sh = Math.min(cvs.height, maxY + padding + 1) - sy;
+
+      var flash = ctx.createImageData(cvs.width, cvs.height);
+      flash.data.set(data);
+      for (var fy = sy; fy < sy + sh; fy++) {
+        for (var fx = sx; fx < sx + sw; fx++) {
+          var i = (fy * cvs.width + fx) * 4;
+          if (data[i + 3] > 10) {
+            flash.data[i]     = 255;
+            flash.data[i + 1] = 235;
+            flash.data[i + 2] = 120;
+            flash.data[i + 3] = 255;
+          } else {
+            flash.data[i]     = 55;
+            flash.data[i + 1] = 55;
+            flash.data[i + 2] = 55;
+            flash.data[i + 3] = 255;
+          }
+        }
+      }
+
+      ctx.putImageData(flash, 0, 0);
+      setTimeout(function() {
+        ctx.putImageData(original, 0, 0);
+        var tmp = document.createElement('canvas');
+        tmp.width = sw;
+        tmp.height = sh;
+        tmp.getContext('2d').drawImage(cvs, sx, sy, sw, sh, 0, 0, sw, sh);
+        tmp.toBlob(function(blob) {
+          navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
+        });
+      }, 150);
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.textContent.toLowerCase() === name);
+      });
+      document.querySelectorAll('.tab-pane').forEach(function(pane) {
+        pane.classList.toggle('active', pane.id === 'tab-' + name);
+      });
+    }
+
     if (typeof btoa == "undefined") {
       function btoa(str) {
         var chars =
@@ -350,72 +459,87 @@
         2024</div>
     </div>
     <div class="sidebar">
-      <div class="pill">
-        <div class="center">
-          Export as: <a href="javascript:saveAsPNG()">PNG</a> |
-          <a href="javascript:saveAsSVG()">SVG</a> |
-          <a href="javascript:saveAsLaTeX()">LaTeX</a> |
-          <a href="javascript:saveAsJson()">Save As Json</a> |
-          <a href="javascript:loadFromJson()">Load Json</a> |
-          <a href="javascript:saveAsLaTeXForObsidian()">LaTeX for Obsidian</a>
+      <div class="tab-container">
+        <div class="tab-header">
+          <button class="tab-btn active" onclick="switchTab('tools')">Tools</button>
+          <button class="tab-btn" onclick="switchTab('manual')">Manual</button>
+        </div>
+        <div id="tab-tools" class="tab-pane active">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button onclick="clearCanvas()" style="padding:6px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:14px;">🗑️</button>
+            <span>Clear Canvas</span>
+          </div>
+          <div>
+            <label for="nodeRadiusSlider">Node radius: <span id="nodeRadiusValue">30</span></label><br>
+            <input id="nodeRadiusSlider" type="range" min="15" max="60" value="30" style="width:100%"
+              oninput="nodeRadius = +this.value; document.getElementById('nodeRadiusValue').textContent = this.value; draw();">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button onclick="renumberStates()" style="padding:6px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:14px;">🔢</button>
+            <span>Renumber</span>
+          </div>
+          <textarea id="output"></textarea>
+          <hr style="border:none;border-top:1px solid #e0e0e0;margin:4px 0;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button onclick="saveAsJson()" style="padding:6px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:14px;">💾</button>
+              <span>Save As Json</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button onclick="loadFromJson()" style="padding:6px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:14px;">📂</button>
+              <span>Load Json</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button onclick="spinToClipboard()" style="padding:6px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:14px;">📸</button>
+              <span>Snip to Clipboard</span>
+            </div>
+          </div>
+        </div>
+        <div id="tab-manual" class="tab-pane">
+          <div>
+            The big white box to the left is the FSM designer.<br>Here's how to use it:
+          </div>
+          <div class="list">
+            <ul>
+              <li><b>Add a state:</b> double-click on the canvas</li>
+              <li><b>Make accept state:</b> double-click on an existing state</li>
+              <li><b>Add an arrow:</b> shift-drag on the canvas <br>Either from state to state or, to create the start
+                state, from canvas to state</li>
+              <li><b>Move something:</b> drag it around</li>
+              <li>
+                <b>Delete something:</b> click it and press the delete key or shift + backspace
+              </li>
+            </ul>
 
-
+            <ul>
+              <li>
+                <b>DPDA transitions</b> — one rule per line on a link label (press Enter for a new line):<br>
+                <code>a,X / push XY</code> — read <i>a</i>, pop <i>X</i>, push X then Y (Y on top)<br>
+                <code>a,X / pop</code> — read <i>a</i>, pop <i>X</i>, push nothing<br>
+                <code>a,X / @e</code> — read <i>a</i>, leave stack unchanged<br>
+                Use <code>\estack</code> as the stack symbol to match an empty stack.
+              </li>
+            </ul>
+            <ul>
+              <li>
+                <b>Subscripts:</b> all characters directly following an underscore (without white spaces) will be
+                subscripted <br>
+                Example: "a_123" will be exportet as "a_{123}" and "a_abc1" as "a_{abc1}"<br>
+                Unfortunately, UniCode does not support subscripting of all characters, so just subscripts of only numbers
+                will be visualized on the canvas.
+              </li>
+              <li>
+                <b>Greek letters:</b> put a backslash before it (like "\beta"), "@e" is a shortcut for epsilon
+              </li>
+              <li><b>Emptyset:</b> typing "\es" will convert to the empty set (∅)</li>
+              <li><b>Union:</b> typing "cup" will convert to the union symbol (⋃)</li>
+              <li><b>Arrows:</b> "->" will be converted to "→"</li>
+              <li><b>New line:</b> either press the "Enter" key to enter a new line or manually type "\n"</li>
+              <li><b>Blank Symbol:</b> either "blk" or "blank" will be replaced with ⊔</li>
+            </ul>
+          </div>
+          <div>This was made in HTML5 and JavaScript using the canvas element.</div>
         </div>
-        <div>
-          <a href="javascript:clearCanvas()">Clear Canvas</a>
-        </div>
-        <div>
-          <label for="nodeRadiusSlider">Node radius: <span id="nodeRadiusValue">30</span></label><br>
-          <input id="nodeRadiusSlider" type="range" min="15" max="60" value="30" style="width:100%"
-            oninput="nodeRadius = +this.value; document.getElementById('nodeRadiusValue').textContent = this.value; draw();">
-          <button onclick="renumberStates()" style="margin-top:6px;width:100%;padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:11pt;">Renumber</button>
-        </div>
-        <textarea id="output"></textarea>
-      </div>
-      <div class="pill">
-        <div>
-          The big white box to the left is the FSM designer.<br>Here's how to use it:
-        </div>
-        <div class="list">
-          <ul>
-            <li><b>Add a state:</b> double-click on the canvas</li>
-            <li><b>Make accept state:</b> double-click on an existing state</li>
-            <li><b>Add an arrow:</b> shift-drag on the canvas <br>Either from state to state or, to create the start
-              state, from canvas to state</li>
-            <li><b>Move something:</b> drag it around</li>
-            <li>
-              <b>Delete something:</b> click it and press the delete key or shift + backspace
-            </li>
-          </ul>
-
-          <ul>
-            <li>
-              <b>DPDA transitions</b> — one rule per line on a link label (press Enter for a new line):<br>
-              <code>a,X / push XY</code> — read <i>a</i>, pop <i>X</i>, push X then Y (Y on top)<br>
-              <code>a,X / pop</code> — read <i>a</i>, pop <i>X</i>, push nothing<br>
-              <code>a,X / @e</code> — read <i>a</i>, leave stack unchanged<br>
-              Use <code>\estack</code> as the stack symbol to match an empty stack.
-            </li>
-          </ul>
-          <ul>
-            <li>
-              <b>Subscripts:</b> all characters directly following an underscore (without white spaces) will be
-              subscripted <br>
-              Example: "a_123" will be exportet as "a_{123}" and "a_abc1" as "a_{abc1}"<br>
-              Unfortunately, UniCode does not support subscripting of all characters, so just subscripts of only numbers
-              will be visualized on the canvas.
-            </li>
-            <li>
-              <b>Greek letters:</b> put a backslash before it (like "\beta"), "@e" is a shortcut for epsilon
-            </li>
-            <li><b>Emptyset:</b> typing "\es" will convert to the empty set (∅)</li>
-            <li><b>Union:</b> typing "cup" will convert to the union symbol (⋃)</li>
-            <li><b>Arrows:</b> "->" will be converted to "→"</li>
-            <li><b>New line:</b> either press the "Enter" key to enter a new line or manually type "\n"</li>
-            <li><b>Blank Symbol:</b> either "blk" or "blank" will be replaced with ⊔</li>
-          </ul>
-        </div>
-        <div>This was made in HTML5 and JavaScript using the canvas element.</div>
       </div>
     </div>
   </div>
