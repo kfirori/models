@@ -1332,9 +1332,16 @@ function renumberStates() {
     }
 
     var allPrefixed = nodes.every(function(n) { return /^q_\d+$/.test(n.text); });
+    var allNumbered = nodes.every(function(n) { return /^\d+$/.test(n.text); });
 
     for (var i = 0; i < order.length; i++) {
-        nodes[order[i]].text = allPrefixed ? String(i) : 'q_' + i;
+        if (allPrefixed) {
+            nodes[order[i]].text = String(i);
+        } else if (allNumbered) {
+            nodes[order[i]].text = '';
+        } else {
+            nodes[order[i]].text = 'q_' + i;
+        }
     }
 
     draw();
