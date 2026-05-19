@@ -2,74 +2,74 @@
   "nodeRadius": 25,
   "nodes": [
     {
-      "x": 266,
-      "y": 140,
+      "x": 227.5,
+      "y": 187,
       "text": "0",
       "isAcceptState": false
     },
     {
-      "x": 419,
-      "y": 140,
+      "x": 380.5,
+      "y": 187,
       "text": "1",
       "isAcceptState": false
     },
     {
-      "x": 566,
-      "y": 140,
+      "x": 527.5,
+      "y": 187,
       "text": "2",
       "isAcceptState": false
     },
     {
-      "x": 707,
-      "y": 274,
+      "x": 668.5,
+      "y": 321,
       "text": "4",
       "isAcceptState": false
     },
     {
-      "x": 847,
-      "y": 274,
+      "x": 808.5,
+      "y": 321,
       "text": "6",
       "isAcceptState": false
     },
     {
-      "x": 1011,
-      "y": 140,
+      "x": 972.5,
+      "y": 187,
       "text": "8",
       "isAcceptState": false
     },
     {
-      "x": 1011,
-      "y": 274,
+      "x": 972.5,
+      "y": 321,
       "text": "10",
       "isAcceptState": false
     },
     {
-      "x": 847,
-      "y": 416,
+      "x": 808.5,
+      "y": 463,
       "text": "9",
       "isAcceptState": false
     },
     {
-      "x": 566,
-      "y": 274,
+      "x": 527.5,
+      "y": 321,
       "text": "3",
       "isAcceptState": false
     },
     {
-      "x": 566,
-      "y": 416,
+      "x": 527.5,
+      "y": 463,
       "text": "11",
       "isAcceptState": false
     },
     {
-      "x": 419,
-      "y": 274,
+      "x": 380.5,
+      "y": 321,
       "text": "5",
       "isAcceptState": false
     },
     {
-      "x": 419,
-      "y": 416,
+      "x": 380.5,
+      "y": 463,
       "text": "7",
       "isAcceptState": true
     }

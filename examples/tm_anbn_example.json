@@ -1,0 +1,116 @@
+{
+  "nodeRadius": 30,
+  "nodes": [
+    {
+      "x": 409,
+      "y": 237.5,
+      "text": "0",
+      "isAcceptState": false
+    },
+    {
+      "x": 609,
+      "y": 237.5,
+      "text": "1",
+      "isAcceptState": false
+    },
+    {
+      "x": 791,
+      "y": 237.5,
+      "text": "2",
+      "isAcceptState": false
+    },
+    {
+      "x": 417,
+      "y": 412.5,
+      "text": "3",
+      "isAcceptState": false
+    },
+    {
+      "x": 609,
+      "y": 412.5,
+      "text": "4",
+      "isAcceptState": true
+    }
+  ],
+  "links": [
+    {
+      "type": "StartLink",
+      "node": 0,
+      "text": "",
+      "deltaX": -60,
+      "deltaY": -28
+    },
+    {
+      "type": "Link",
+      "nodeA": 0,
+      "nodeB": 1,
+      "text": "a/A R",
+      "lineAngleAdjust": 3.141592653589793,
+      "parallelPart": 0.48520710059171596,
+      "perpendicularPart": 0
+    },
+    {
+      "type": "Link",
+      "nodeA": 1,
+      "nodeB": 2,
+      "text": "b/B L",
+      "lineAngleAdjust": 3.141592653589793,
+      "parallelPart": 0.46153846153846156,
+      "perpendicularPart": 0
+    },
+    {
+      "type": "SelfLink",
+      "node": 1,
+      "text": "a/a R  B/B R",
+      "anchorAngle": -1.5707963267948966
+    },
+    {
+      "type": "SelfLink",
+      "node": 2,
+      "text": "B/B L  a/a L",
+      "anchorAngle": -1.5707963267948966
+    },
+    {
+      "type": "Link",
+      "nodeA": 2,
+      "nodeB": 0,
+      "text": "A/A R",
+      "lineAngleAdjust": 3.141592653589793,
+      "parallelPart": 0.6029411764705882,
+      "perpendicularPart": 120
+    },
+    {
+      "type": "Link",
+      "nodeA": 0,
+      "nodeB": 3,
+      "text": "B/B R",
+      "lineAngleAdjust": 0,
+      "parallelPart": 0.5,
+      "perpendicularPart": 0
+    },
+    {
+      "type": "SelfLink",
+      "node": 3,
+      "text": "B/B R",
+      "anchorAngle": -2.9275319700259717
+    },
+    {
+      "type": "Link",
+      "nodeA": 3,
+      "nodeB": 4,
+      "text": "\\ecell/\\ecell L",
+      "lineAngleAdjust": 0,
+      "parallelPart": 0.5,
+      "perpendicularPart": 0
+    },
+    {
+      "type": "Link",
+      "nodeA": 0,
+      "nodeB": 4,
+      "text": "\\ecell/\\ecell R",
+      "lineAngleAdjust": 0,
+      "parallelPart": 0.5,
+      "perpendicularPart": 0
+    }
+  ]
+}

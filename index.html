@@ -34,6 +34,7 @@
 
     a {
       color: black;
+      text-decoration: none;
     }
 
     .leftside {
@@ -166,6 +167,11 @@
   </style>
   <script src="https://cdn.jsdelivr.net/npm/tsparticles-confetti@2.12.0/tsparticles.confetti.bundle.min.js"></script>
   <script src="fsm.js"></script>
+  <script>var _examples = {}; function registerExample(n, d) { _examples[n] = d; }</script>
+  <script src="examples/dfa_example_1.js"></script>
+  <script src="examples/pda_anbn_example.js"></script>
+  <script src="examples/tm_anbn_example.js"></script>
+  <script src="examples/tm_2_exp_x_example.js"></script>
   <script>
     /*
      * base64.js - Base64 encoding and decoding functions
@@ -338,14 +344,8 @@
       }, 150);
     }
 
-    var examples = {
-      'dfa_example_1': {"nodeRadius":30,"nodes":[{"x":354,"y":328,"text":"q_0","isAcceptState":false},{"x":567,"y":328,"text":"q_1","isAcceptState":false},{"x":354,"y":502,"text":"q_2","isAcceptState":false},{"x":567,"y":502,"text":"q_3","isAcceptState":false},{"x":744,"y":502,"text":"q_4","isAcceptState":true}],"links":[{"type":"StartLink","node":0,"text":"","deltaX":-77,"deltaY":-49},{"type":"Link","nodeA":0,"nodeB":1,"text":"a","lineAngleAdjust":3.141592653589793,"parallelPart":0.5117370892018779,"perpendicularPart":-19},{"type":"Link","nodeA":0,"nodeB":2,"text":"b","lineAngleAdjust":0,"parallelPart":0.43103448275862066,"perpendicularPart":22},{"type":"Link","nodeA":2,"nodeB":3,"text":"a","lineAngleAdjust":3.141592653589793,"parallelPart":0.553921568627451,"perpendicularPart":-17},{"type":"SelfLink","node":0,"text":"c","anchorAngle":-1.5707963267948966},{"type":"SelfLink","node":1,"text":"c","anchorAngle":-1.5707963267948966},{"type":"SelfLink","node":2,"text":"c","anchorAngle":1.5707963267948966},{"type":"Link","nodeA":1,"nodeB":0,"text":"a","lineAngleAdjust":3.141592653589793,"parallelPart":0.5492957746478874,"perpendicularPart":-16},{"type":"Link","nodeA":3,"nodeB":2,"text":"a","lineAngleAdjust":3.141592653589793,"parallelPart":0.46568627450980393,"perpendicularPart":-19},{"type":"Link","nodeA":1,"nodeB":3,"text":"b","lineAngleAdjust":0,"parallelPart":0.5057471264367817,"perpendicularPart":24},{"type":"Link","nodeA":3,"nodeB":1,"text":"b","lineAngleAdjust":0,"parallelPart":0.5172413793103449,"perpendicularPart":17},{"type":"Link","nodeA":3,"nodeB":4,"text":"c","lineAngleAdjust":3.141592653589793,"parallelPart":0.48199698808926206,"perpendicularPart":-16.557409574000815},{"type":"Link","nodeA":4,"nodeB":3,"text":"c","lineAngleAdjust":3.141592653589793,"parallelPart":0.5496737096700589,"perpendicularPart":-17.354543123463117},{"type":"Link","nodeA":4,"nodeB":2,"text":"a","lineAngleAdjust":0,"parallelPart":0.4846153846153846,"perpendicularPart":-69},{"type":"Link","nodeA":4,"nodeB":1,"text":"b","lineAngleAdjust":0,"parallelPart":0.5607012417823228,"perpendicularPart":16.03925516833633},{"type":"Link","nodeA":2,"nodeB":0,"text":"b","lineAngleAdjust":0,"parallelPart":0.4942528735632184,"perpendicularPart":27}]},
-      'pda_anbn': {"nodeRadius":30,"nodes":[{"x":312,"y":359,"text":"q_0","isAcceptState":true},{"x":520,"y":359,"text":"q_1","isAcceptState":false},{"x":727,"y":356,"text":"q_2","isAcceptState":false},{"x":520,"y":527,"text":"q_3","isAcceptState":true}],"links":[{"type":"StartLink","node":0,"text":"","deltaX":-56,"deltaY":-50},{"type":"Link","nodeA":0,"nodeB":1,"text":"a,\\estack / push S","lineAngleAdjust":3.141592653589793,"parallelPart":0.4807692307692308,"perpendicularPart":0},{"type":"SelfLink","node":1,"text":"a,S / push A\\na,A / push A","anchorAngle":-1.5707963267948966},{"type":"Link","nodeA":1,"nodeB":2,"text":"b,A / pop","lineAngleAdjust":3.141592653589793,"parallelPart":0.45919081618367624,"perpendicularPart":0},{"type":"SelfLink","node":2,"text":"b,A / pop","anchorAngle":-1.2068173702852525},{"type":"Link","nodeA":1,"nodeB":3,"text":"b,S / pop","lineAngleAdjust":0,"parallelPart":0.5238095238095238,"perpendicularPart":0},{"type":"Link","nodeA":2,"nodeB":3,"text":"b,S / pop\\n","lineAngleAdjust":3.141592653589793,"parallelPart":0.5139825218476903,"perpendicularPart":0}]},
-      'tm_2_exp_x': {"nodeRadius":25,"nodes":[{"x":266,"y":140,"text":"0","isAcceptState":false},{"x":419,"y":140,"text":"1","isAcceptState":false},{"x":566,"y":140,"text":"2","isAcceptState":false},{"x":707,"y":274,"text":"4","isAcceptState":false},{"x":847,"y":274,"text":"6","isAcceptState":false},{"x":1011,"y":140,"text":"8","isAcceptState":false},{"x":1011,"y":274,"text":"10","isAcceptState":false},{"x":847,"y":416,"text":"9","isAcceptState":false},{"x":566,"y":274,"text":"3","isAcceptState":false},{"x":566,"y":416,"text":"11","isAcceptState":false},{"x":419,"y":274,"text":"5","isAcceptState":false},{"x":419,"y":416,"text":"7","isAcceptState":true}],"links":[{"type":"StartLink","node":0,"text":"","deltaX":-86,"deltaY":-30},{"type":"Link","nodeA":0,"nodeB":1,"text":"\\ecell/$ R","lineAngleAdjust":3.141592653589793,"parallelPart":0.6274509803921569,"perpendicularPart":0},{"type":"SelfLink","node":0,"text":"1/1 R","anchorAngle":-1.5707963267948966},{"type":"Link","nodeA":1,"nodeB":2,"text":"\\ecell/1 L","lineAngleAdjust":3.141592653589793,"parallelPart":0.3469387755102041,"perpendicularPart":0},{"type":"SelfLink","node":2,"text":"$/$ L  1/1 L","anchorAngle":-1.5707963267948966},{"type":"SelfLink","node":3,"text":"1/1 R","anchorAngle":-1.5707963267948966},{"type":"Link","nodeA":3,"nodeB":4,"text":"$/$ R","lineAngleAdjust":3.141592653589793,"parallelPart":0.4857142857142857,"perpendicularPart":0},{"type":"Link","nodeA":4,"nodeB":5,"text":"1/X R","lineAngleAdjust":3.141592653589793,"parallelPart":0.4247489907877031,"perpendicularPart":0},{"type":"SelfLink","node":5,"text":"1/1 R  Y/Y R","anchorAngle":-1.5707963267948966},{"type":"Link","nodeA":5,"nodeB":6,"text":"\\ecell/Y L","lineAngleAdjust":3.141592653589793,"parallelPart":0.5227272727272727,"perpendicularPart":0},{"type":"SelfLink","node":6,"text":"Y/Y L  1/1 L","anchorAngle":1.5707963267948966},{"type":"Link","nodeA":6,"nodeB":4,"text":"X/1 R","lineAngleAdjust":3.141592653589793,"parallelPart":0.5151307494106682,"perpendicularPart":0},{"type":"Link","nodeA":4,"nodeB":7,"text":"Y/1 R","lineAngleAdjust":3.141592653589793,"parallelPart":0.5211267605633803,"perpendicularPart":0},{"type":"SelfLink","node":7,"text":"Y/1 R","anchorAngle":1.5707963267948966},{"type":"Link","nodeA":2,"nodeB":8,"text":"\\dashv/\\dashv R","lineAngleAdjust":3.141592653589793,"parallelPart":0.5225806451612903,"perpendicularPart":0},{"type":"Link","nodeA":8,"nodeB":3,"text":"1/X R","lineAngleAdjust":3.141592653589793,"parallelPart":0.3939393939393939,"perpendicularPart":0},{"type":"Link","nodeA":7,"nodeB":9,"text":"\\ecell/\\ecell L","lineAngleAdjust":0,"parallelPart":0.5510204081632653,"perpendicularPart":0},{"type":"SelfLink","node":9,"text":"1/1 L  $/$ L","anchorAngle":1.5707963267948966},{"type":"Link","nodeA":9,"nodeB":8,"text":"X/X R","lineAngleAdjust":0,"parallelPart":0.5,"perpendicularPart":0},{"type":"Link","nodeA":8,"nodeB":10,"text":"$/$ R","lineAngleAdjust":0,"parallelPart":0.5,"perpendicularPart":0},{"type":"SelfLink","node":10,"text":"1/1 R","anchorAngle":-3.141592653589793},{"type":"Link","nodeA":10,"nodeB":11,"text":"\\ecell/$ L","lineAngleAdjust":0,"parallelPart":0.532051282051282,"perpendicularPart":0}]}
-    };
-
     function loadExample(name) {
-      if (examples[name]) loadJsonData(examples[name]);
+      if (_examples[name]) loadJsonData(_examples[name]);
     }
 
     function switchTab(name) {
@@ -518,9 +518,10 @@
           <hr style="border:none;border-top:1px solid #e0e0e0;margin:4px 0;">
           <div style="font-weight:bold;font-size:10pt;color:#555;text-align:left;">Examples</div>
           <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
-            <a href="javascript:loadExample('dfa_example_1')">DFA Example 1</a>
-            <a href="javascript:loadExample('pda_anbn')">PDA for {a<sup>n</sup>b<sup>n</sup> | n≥0}</a>
-            <a href="javascript:loadExample('tm_2_exp_x')">TM for f(x)=2<sup>x</sup></a>
+            <a href="javascript:loadExample('dfa_example_1')" style="color:#4a90d9;">DFA Example 1</a>
+            <a href="javascript:loadExample('pda_anbn_example')" style="color:#4a90d9;">PDA for {a<sup>n</sup>b<sup>n</sup> | n≥0}</a>
+            <a href="javascript:loadExample('tm_anbn_example')" style="color:#4a90d9;">TM for {a<sup>n</sup>b<sup>n</sup> | n≥0}</a>
+            <a href="javascript:loadExample('tm_2_exp_x_example')" style="color:#4a90d9;">TM for f(x)=2<sup>x</sup></a>
           </div>
         </div>
         <div id="tab-manual" class="tab-pane">
