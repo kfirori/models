@@ -1347,6 +1347,33 @@ function renumberStates() {
     draw();
 }
 
+function centerStates() {
+    if (nodes.length === 0) return;
+
+    var minX = nodes[0].x, maxX = nodes[0].x;
+    var minY = nodes[0].y, maxY = nodes[0].y;
+    for (var i = 1; i < nodes.length; i++) {
+        if (nodes[i].x < minX) minX = nodes[i].x;
+        if (nodes[i].x > maxX) maxX = nodes[i].x;
+        if (nodes[i].y < minY) minY = nodes[i].y;
+        if (nodes[i].y > maxY) maxY = nodes[i].y;
+    }
+
+    var groupCx = (minX + maxX) / 2;
+    var groupCy = (minY + maxY) / 2;
+    var canvasCx = canvas.width / 2;
+    var canvasCy = canvas.height / 2;
+    var dx = canvasCx - groupCx;
+    var dy = canvasCy - groupCy;
+
+    for (var i = 0; i < nodes.length; i++) {
+        nodes[i].x += dx;
+        nodes[i].y += dy;
+    }
+
+    draw();
+}
+
 // Adjust link.perpendicularPart so the arc clears any node that lies on its straight path.
 // Uses the parabolic approximation: arc offset at t ≈ p × 4t(1-t).
 function autoAdjustLinkCurve(link) {
