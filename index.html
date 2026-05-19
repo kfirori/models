@@ -116,14 +116,20 @@
     }
 
     .tab-pane {
-      display: none;
-      padding: 20px;
+      display: flex;
       flex-direction: column;
       gap: 10px;
+      max-height: 0;
+      overflow: hidden;
+      padding: 0 20px;
+      pointer-events: none;
     }
 
     .tab-pane.active {
-      display: flex;
+      max-height: none;
+      overflow: visible;
+      padding: 20px;
+      pointer-events: auto;
     }
 
     .error {
@@ -159,6 +165,8 @@
     .manual-section > summary {
       cursor: pointer;
       font-weight: bold;
+      display: list-item;
+      text-align: left;
       font-size: 11pt;
       padding: 6px 4px;
       user-select: none;

@@ -1453,6 +1453,9 @@ window.onload = function () {
     restoreBackup();
     draw();
 
+    var tabContainer = document.querySelector('.tab-container');
+    if (tabContainer) tabContainer.style.minWidth = tabContainer.offsetWidth + 'px';
+
     canvas.onmousedown = function (e) {
         var mouse = crossBrowserRelativeMousePos(e);
         selectedObject = selectObject(mouse.x, mouse.y);
