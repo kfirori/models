@@ -566,15 +566,37 @@
             </div>
           </details>
           <details class="manual-section">
-            <summary>DPDA</summary>
+            <summary>DFA</summary>
             <div class="list">
               <ul>
-                <li>
-                  <b>DPDA transitions</b> — one rule per line on a link label (press Enter for a new line):<br>
+                <li>Each link label is a comma-separated list of input symbols:<br>
+                  <code>a</code> — transition on <i>a</i><br>
+                  <code>a,b</code> — transition on <i>a</i> or <i>b</i>
+                </li>
+              </ul>
+            </div>
+          </details>
+          <details class="manual-section">
+            <summary>PDA</summary>
+            <div class="list">
+              <ul>
+                <li>One rule per line (press Enter for a new line), format: <code>input,stack / op</code><br>
                   <code>a,X / push XY</code> — read <i>a</i>, pop <i>X</i>, push X then Y (Y on top)<br>
-                  <code>a,X / pop</code> — read <i>a</i>, pop <i>X</i>, push nothing<br>
+                  <code>a,X / pop</code> — read <i>a</i>, pop <i>X</i><br>
                   <code>a,X / @e</code> — read <i>a</i>, leave stack unchanged<br>
-                  Use <code>\estack</code> or <code>@s</code> as the stack symbol to match an empty stack.
+                  Use <code>@s</code> as the stack symbol to match an empty stack.
+                </li>
+              </ul>
+            </div>
+          </details>
+          <details class="manual-section">
+            <summary>TM</summary>
+            <div class="list">
+              <ul>
+                <li>Each link label is one or more transitions separated by two spaces, format: <code>read/write dir</code><br>
+                  <code>a/b R</code> — read <i>a</i>, write <i>b</i>, move right<br>
+                  <code>@c/$ R</code> — read blank cell, write <i>$</i>, move right<br>
+                  <code>@t/@t R</code> — read left-end marker, keep it, move right
                 </li>
               </ul>
             </div>
