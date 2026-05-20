@@ -535,9 +535,6 @@
         <div id="tab-manual" class="tab-pane">
           <details class="manual-section" open>
             <summary>Designer</summary>
-            <div>
-              The big white box to the left is the FSM designer.<br>Here's how to use it:
-            </div>
             <div class="list">
               <ul>
                 <li><b>Add a state:</b> double-click on the canvas</li>
@@ -548,26 +545,25 @@
                 <li>
                   <b>Delete something:</b> click it and press the delete key or shift + backspace
                 </li>
-              </ul>
-              <ul>
-                <li>
-                  <b>Subscripts:</b> all characters directly following an underscore (without white spaces) will be
-                  subscripted <br>
-                  Example: "a_123" will be exportet as "a_{123}" and "a_abc1" as "a_{abc1}"<br>
-                  Unfortunately, UniCode does not support subscripting of all characters, so just subscripts of only numbers
-                  will be visualized on the canvas.
-                </li>
-                <li>
-                  <b>Greek letters:</b> put a backslash before it (like "\beta"), "@e" is a shortcut for epsilon
-                </li>
-                <li><b>Emptyset:</b> typing "\es" will convert to the empty set (∅)</li>
-                <li><b>Union:</b> typing "cup" will convert to the union symbol (⋃)</li>
-                <li><b>Arrows:</b> "->" will be converted to "→"</li>
-                <li><b>New line:</b> either press the "Enter" key to enter a new line or manually type "\n"</li>
-                <li><b>Blank Symbol:</b> either "blk" or "blank" will be replaced with ⊔</li>
+                <li><b>Multi select:</b> ctrl + select a region</li>
               </ul>
             </div>
-            <div>This was made in HTML5 and JavaScript using the canvas element.</div>
+          </details>
+          <details class="manual-section">
+            <summary>Text Editing</summary>
+            <div class="list">
+              <ul>
+                <li><b>New line:</b> press Enter or type <code>\n</code></li>
+                <li><b>Subscripts:</b> <code>q_1</code>, <code>q_13</code>, <code>q_a</code>, ...</li>
+                <li><b>Greek letters:</b> <code>\alpha</code>, <code>\beta</code>, <code>\gamma</code>, ... — <code>@e</code> is a shortcut for epsilon (ε)</li>
+                <li><code>\es</code> for ∅</li>
+                <li><code>cup</code> for ⋃</li>
+                <li><code>-&gt;</code> for →</li>
+                <li><code>\ecell</code> or <code>@c</code> for ∆</li>
+                <li><code>\dashv</code> or <code>@t</code> for ⊣</li>
+                <li><code>\estack</code> or <code>@s</code> for &#10178;</li>
+              </ul>
+            </div>
           </details>
           <details class="manual-section">
             <summary>DPDA</summary>
@@ -578,7 +574,7 @@
                   <code>a,X / push XY</code> — read <i>a</i>, pop <i>X</i>, push X then Y (Y on top)<br>
                   <code>a,X / pop</code> — read <i>a</i>, pop <i>X</i>, push nothing<br>
                   <code>a,X / @e</code> — read <i>a</i>, leave stack unchanged<br>
-                  Use <code>\estack</code> as the stack symbol to match an empty stack.
+                  Use <code>\estack</code> or <code>@s</code> as the stack symbol to match an empty stack.
                 </li>
               </ul>
             </div>

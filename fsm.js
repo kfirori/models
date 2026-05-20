@@ -963,6 +963,10 @@ var greekLetterNames = [
 
 function convertLatexShortcuts(text) {
 
+    text = text.replace(/@s/g, '\\estack');
+    text = text.replace(/@c/g, '\\ecell');
+    text = text.replace(/@t/g, '\\dashv');
+
     text = text.replace(new RegExp('\\\\estack', 'g'), String.fromCharCode(10178));
     text = text.replace(new RegExp('\\\\ecell', 'g'), String.fromCharCode(8710));
     text = text.replace(new RegExp('\\\\dashv', 'g'), String.fromCharCode(8867));
@@ -1990,8 +1994,8 @@ function toTuring() {
             }
             var match = segment.match(/^(.+)\/(.+)\s+(\S+)$/);
             if (match) {
-                var read = match[1].replace(/\\ecell|\\dashv/g, "_");
-                var write = match[2].replace(/\\ecell|\\dashv/g, "_");
+                var read = match[1].replace(/\\ecell|\\dashv|@c|@t/g, "_");
+                var write = match[2].replace(/\\ecell|\\dashv|@c|@t/g, "_");
                 var dir = match[3].toLowerCase();
                 lines.push(tmStateName(fromText) + " " + read + " " + tmStateName(toText) + " " + write + " " + dir);
             }
@@ -2038,8 +2042,8 @@ function parseTuringProgram() {
             var match = segment.match(/^(.+)\/(.+)\s+(\S+)$/);
             if (match) {
                 var DASHV = String.fromCharCode(8867);
-                var read = match[1].trim().replace(/\\ecell/g, '_').replace(/\\dashv/g, DASHV);
-                var write = match[2].trim().replace(/\\ecell/g, '_').replace(/\\dashv/g, DASHV);
+                var read = match[1].trim().replace(/\\ecell|@c/g, '_').replace(/\\dashv|@t/g, DASHV);
+                var write = match[2].trim().replace(/\\ecell|@c/g, '_').replace(/\\dashv|@t/g, DASHV);
                 var dir = match[3].trim().toLowerCase();
                 transitions[tmStateName(fromText) + '|' + read] = { to: tmStateName(toText), write: write, dir: dir };
             }
@@ -2153,7 +2157,7 @@ function tmCompile() {
         errors.push('More than one initial state found — only one start arrow is allowed.');
     }
 
-    var sym = '(?:\\\\[a-zA-Z]+|[^\\s/])';
+    var sym = '(?:\\\\[a-zA-Z]+|@[cts]|[^\\s/])';
     var segmentPattern = new RegExp('^' + sym + '\\/' + sym + '\\s+[LRlr]$');
     for (var i = 0; i < links.length; i++) {
         var link = links[i];
@@ -2716,6 +2720,7 @@ function dpdaParseRule(ruleText) {
     if (commaIdx === -1) return null;
     var inputSym = left.substring(0, commaIdx).trim();
     var stackSym = left.substring(commaIdx + 1).trim();
+    if (stackSym === '@s') stackSym = '\\estack';
     var opLower = opText.toLowerCase();
     var op;
     if (opLower === 'pop') {
