@@ -1986,13 +1986,14 @@ function toTuring() {
             continue;
         }
 
-        var segments = link.text.trim().split(/\s{2,}/);
+        var useComma = /[^\s\/],[LRlr](\s|$)/i.test(link.text);
+        var segments = link.text.trim().split(useComma ? /\s+/ : /\s{2,}/);
         for (var j = 0; j < segments.length; j++) {
             var segment = segments[j].trim();
             if (!segment) {
                 continue;
             }
-            var match = segment.match(/^(.+)\/(.+)\s+(\S+)$/);
+            var match = segment.match(/^(.+)\/(.+?)(?:\s+|,)([LRlr])$/i);
             if (match) {
                 var read = match[1].replace(/\\ecell|\\dashv|@c|@t/g, "_");
                 var write = match[2].replace(/\\ecell|\\dashv|@c|@t/g, "_");
@@ -2035,11 +2036,12 @@ function parseTuringProgram() {
         } else {
             continue;
         }
-        var segments = link.text.trim().split(/\s{2,}/);
+        var useComma = /[^\s\/],[LRlr](\s|$)/i.test(link.text);
+        var segments = link.text.trim().split(useComma ? /\s+/ : /\s{2,}/);
         for (var j = 0; j < segments.length; j++) {
             var segment = segments[j].trim();
             if (!segment) continue;
-            var match = segment.match(/^(.+)\/(.+)\s+(\S+)$/);
+            var match = segment.match(/^(.+)\/(.+?)(?:\s+|,)([LRlr])$/i);
             if (match) {
                 var DASHV = String.fromCharCode(8867);
                 var read = match[1].trim().replace(/\\ecell|@c/g, '_').replace(/\\dashv|@t/g, DASHV);
@@ -2158,17 +2160,20 @@ function tmCompile() {
     }
 
     var sym = '(?:\\\\[a-zA-Z]+|@[cts]|[^\\s/])';
-    var segmentPattern = new RegExp('^' + sym + '\\/' + sym + '\\s+[LRlr]$');
+    var symNc = '(?:\\\\[a-zA-Z]+|@[cts]|[^\\s/,])';
+    var segmentPatternSpace = new RegExp('^' + sym + '\\/' + sym + '\\s+[LRlr]$');
+    var segmentPatternComma = new RegExp('^' + symNc + '\\/' + symNc + ',[LRlr]$');
     for (var i = 0; i < links.length; i++) {
         var link = links[i];
         if (!(link instanceof Link) && !(link instanceof SelfLink)) continue;
         if (!link.text || !link.text.trim()) continue;
-        var segments = link.text.trim().split(/\s{2,}/);
+        var useComma = /[^\s\/],[LRlr](\s|$)/i.test(link.text);
+        var segments = link.text.trim().split(useComma ? /\s+/ : /\s{2,}/);
         var invalid = false;
         for (var j = 0; j < segments.length; j++) {
             var seg = segments[j].trim();
             if (!seg) continue;
-            if (!segmentPattern.test(seg)) { invalid = true; break; }
+            if (!segmentPatternSpace.test(seg) && !segmentPatternComma.test(seg)) { invalid = true; break; }
         }
         if (invalid) {
             tmInvalidLinks.push(link);
