@@ -581,10 +581,10 @@
             <div class="list">
               <ul>
                 <li>One rule per line (press Enter for a new line), format: <code>input,stack / op</code><br>
-                  <code>a,X / push XY</code> — read <i>a</i>, pop <i>X</i>, push X then Y (Y on top)<br>
-                  <code>a,X / pop</code> — read <i>a</i>, pop <i>X</i><br>
-                  <code>a,X / @e</code> — read <i>a</i>, leave stack unchanged<br>
-                  Use <code>@s</code> as the stack symbol to match an empty stack.
+                  <code>a,X / push XY</code> —  if input=<i>a</i>, top=<i>X</i>, push X then Y<br>
+                  <code>a,X / pop</code> — if input=<i>a</i>, top=<i>X</i>, then pop<br>
+                  <code>a,X / @e</code> — if input<i>a</i>, top=<i>X</i>, then leave stack unchanged<br>
+                  Use <code>@s</code> is empty stack  &#10178;.
                 </li>
               </ul>
             </div>
