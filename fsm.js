@@ -52,7 +52,7 @@ function ExportAsLaTeX(isObsidian) {
                 "\n" +
                 "\\begin{center}\n" +
                 "\\begin{tikzpicture}[scale=0.2]\n" +
-                "\\tikzstyle{now gevery node}+=[inner sep=0pt]\n" +
+                "\\tikzstyle{every node}+=[inner sep=0pt]\n" +
                 this._texData +
                 "\\end{tikzpicture}\n" +
                 "\\end{center}\n" +
@@ -176,7 +176,6 @@ function ExportAsLaTeX(isObsidian) {
 
             originalText = originalText.replace(/@e/g, "\\varepsilon ");
             originalText = originalText.replace(/\es/g, "\\emptyset ");
-            // originalText = originalText.replace(/_(\d+)/g, (_, digits) => `_{${digits}}`);
             originalText = originalText.replace(
                 /_(\w+)/g,
                 (_, letters) => `_{${letters}}`
@@ -1043,66 +1042,24 @@ function canvasHasFocus() {
     return (document.activeElement || document.body) == document.body;
 }
 
-/* function drawText(c, originalText, x, y, angleOrNull, isSelected) {
-  text = convertLatexShortcuts(originalText);
-  c.font = '20px "Times New Roman", serif';
-  var width = c.measureText(text).width;
-
-  // center the text
-  x -= width / 2;
-
-  // position the text intelligently if given an angle
-  if (angleOrNull != null) {
-    var cos = Math.cos(angleOrNull);
-    var sin = Math.sin(angleOrNull);
-    var cornerPointX = (width / 2 + 5) * (cos > 0 ? 1 : -1);
-    var cornerPointY = (10 + 5) * (sin > 0 ? 1 : -1);
-    var slide =
-      sin * Math.pow(Math.abs(sin), 40) * cornerPointX -
-      cos * Math.pow(Math.abs(cos), 10) * cornerPointY;
-    x += cornerPointX - sin * slide;
-    y += cornerPointY + cos * slide;
-  }
-
-  // draw text and caret (round the coordinates so the caret falls on a pixel)
-  if ("advancedFillText" in c) {
-    c.advancedFillText(text, originalText, x + width / 2, y, angleOrNull);
-  } else {
-    x = Math.round(x);
-    y = Math.round(y);
-    c.fillText(text, x, y + 6);
-    if (isSelected && caretVisible && canvasHasFocus() && document.hasFocus()) {
-      x += width;
-      c.beginPath();
-      c.moveTo(x, y - 10);
-      c.lineTo(x, y + 10);
-      c.stroke();
-    }
-  }
-} */
-
 function drawText(c, originalText, x, y, angleOrNull, isSelected) {
-    text = convertLatexShortcuts(originalText);
+    const text = convertLatexShortcuts(originalText);
     c.font = '20px "Times New Roman", serif';
 
-    // Aufteilen des Textes in Zeilen
     var lines = text.split('\\n');
     var originalLines = originalText.split('\\n');
 
-    if (angleOrNull != null && ((Math.abs(angleOrNull) < 2 * Math.PI && Math.abs(angleOrNull) > Math.PI)) || (angleOrNull < 0 && angleOrNull > -Math.PI)) {
+    if (angleOrNull != null && ((Math.abs(angleOrNull) < 2 * Math.PI && Math.abs(angleOrNull) > Math.PI) || (angleOrNull < 0 && angleOrNull > -Math.PI))) {
         lines = lines.reverse();
         originalLines = originalLines.reverse();
     }
 
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i];
-        //var line = angleOrNull;
         var width = c.measureText(line).width;
 
-        // Zentrieren des Textes
         var lineX = x - width / 2;
 
-        // Positionieren des Textes, wenn ein Winkel gegeben ist
         if (angleOrNull != null) {
             var cos = Math.cos(angleOrNull);
             var sin = Math.sin(angleOrNull);
@@ -1115,7 +1072,6 @@ function drawText(c, originalText, x, y, angleOrNull, isSelected) {
             y += cornerPointY + cos * slide;
         }
 
-        // Zeichnen des Textes und des Cursors (runden der Koordinaten, damit der Cursor auf einem Pixel landet)
         if ("advancedFillText" in c) {
             c.advancedFillText(line, originalLines[i], lineX + width / 2, y, angleOrNull);
         } else {
@@ -1131,7 +1087,6 @@ function drawText(c, originalText, x, y, angleOrNull, isSelected) {
             }
         }
 
-        // Anpassen der y-Koordinate für die nächste Zeile
         if (angleOrNull != null && ((Math.abs(angleOrNull) < 2 * Math.PI && Math.abs(angleOrNull) > Math.PI)) || (angleOrNull < 0 && angleOrNull > -Math.PI)) {
             y -= 20;
         } else {
@@ -1739,10 +1694,6 @@ function output(text) {
     var element = document.getElementById("output");
     element.style.display = "block";
     element.value = text;
-}
-
-function saveAsPNG() {
-    document.location.href = pngData;
 }
 
 function saveAsPNG() {
