@@ -2813,8 +2813,21 @@ function dpdaInit() {
     document.getElementById('dpda-tape').style.display = 'flex';
     var sc = document.getElementById('dpda-stack-float');
     if (sc) sc.style.display = 'block';
+    dpdaPositionStackFloat();
     dpdaRender();
     draw();
+}
+
+function dpdaPositionStackFloat() {
+    var sc = document.getElementById('dpda-stack-float');
+    var canvas = document.getElementById('canvas');
+    if (!sc || !canvas || sc.dataset.userPositioned === '1') return;
+    var rect = canvas.getBoundingClientRect();
+    var inset = 14;
+    sc.style.right = 'auto';
+    sc.style.top = 'auto';
+    sc.style.left = (rect.left + inset) + 'px';
+    sc.style.bottom = (window.innerHeight - rect.bottom + inset) + 'px';
 }
 
 function dpdaStep() {

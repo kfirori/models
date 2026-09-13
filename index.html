@@ -609,7 +609,7 @@
 <div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:#aaa;z-index:100;">Created by Ori Kfir, based on a designer by <a href="https://madebyevan.com/" style="color:#aaa;">Evan Wallace</a> 2010 and Moritz Liedtke 2024</div>
 
 <div id="dpda-stack-float" onmousedown="dpdaDragStart(event)"
-  style="display:none;position:fixed;top:140px;right:32px;background:white;border-radius:12px;padding:8px 12px 10px;z-index:200;box-shadow:0 2px 14px rgba(0,0,0,0.18);cursor:move;user-select:none;min-width:52px;">
+  style="display:none;position:fixed;bottom:150px;left:40px;background:white;border-radius:12px;padding:8px 12px 10px;z-index:200;box-shadow:0 2px 14px rgba(0,0,0,0.18);cursor:move;user-select:none;min-width:52px;">
   <div style="font-size:11px;color:#aaa;font-family:monospace;text-align:center;margin-bottom:6px;pointer-events:none;letter-spacing:0.04em;">stack</div>
   <div id="dpda-stack" style="display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;"></div>
   <div style="font-size:10px;color:#ccc;font-family:monospace;text-align:center;margin-top:6px;pointer-events:none;">↓ bottom</div>
@@ -620,17 +620,19 @@
   function dpdaDragStart(e) {
     var el = document.getElementById('dpda-stack-float');
     var rect = el.getBoundingClientRect();
+    el.dataset.userPositioned = '1';
     el.style.right = 'auto';
+    el.style.top = 'auto';
     el.style.left = rect.left + 'px';
-    el.style.top = rect.top + 'px';
-    _dpdaDrag = { el: el, ox: e.clientX - rect.left, oy: e.clientY - rect.top };
+    el.style.bottom = (window.innerHeight - rect.bottom) + 'px';
+    _dpdaDrag = { el: el, ox: e.clientX - rect.left, obottom: rect.bottom - e.clientY };
     e.preventDefault();
     e.stopPropagation();
   }
   document.addEventListener('mousemove', function(e) {
     if (!_dpdaDrag) return;
     _dpdaDrag.el.style.left = (e.clientX - _dpdaDrag.ox) + 'px';
-    _dpdaDrag.el.style.top = (e.clientY - _dpdaDrag.oy) + 'px';
+    _dpdaDrag.el.style.bottom = (window.innerHeight - (e.clientY + _dpdaDrag.obottom)) + 'px';
   });
   document.addEventListener('mouseup', function() { _dpdaDrag = null; });
 </script>
