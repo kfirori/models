@@ -221,8 +221,6 @@
       if (typeof dfaHistory !== 'undefined') dfaHistory = [];
       var tapeEl = document.getElementById('dfa-tape');
       if (tapeEl) { tapeEl.innerHTML = ''; tapeEl.style.display = 'none'; }
-      var tapeInput = document.getElementById('dfa-tape-input');
-      if (tapeInput) tapeInput.style.display = '';
       if (typeof draw === 'function') draw();
     }
 
@@ -241,15 +239,23 @@
       if (tooltip) tooltip.style.display = 'none';
     }
 
-    function setSimMode(mode) {
+    function setSimMode(mode, tmMode) {
       if (typeof simMode !== 'undefined') simMode = mode;
       document.getElementById('tm-sim-section').style.display = mode === 'tm' ? '' : 'none';
       document.getElementById('dfa-sim-section').style.display = mode === 'dfa' ? '' : 'none';
       document.getElementById('dpda-sim-section').style.display = mode === 'dpda' ? '' : 'none';
-      ['tm', 'dfa', 'dpda'].forEach(function(m) {
+      ['dfa', 'dpda'].forEach(function(m) {
         var btn = document.getElementById('mode-' + m + '-btn');
         if (btn) { btn.style.background = m === mode ? '#d0e4f7' : '#f0f0f0'; btn.style.fontWeight = m === mode ? 'bold' : 'normal'; }
       });
+      if (mode === 'tm' && typeof tmSetInputMode === 'function') {
+        tmSetInputMode(tmMode || tmInputMode);
+      } else {
+        ['mode-tm-input-btn', 'mode-tm-args-btn'].forEach(function(id) {
+          var btn = document.getElementById(id);
+          if (btn) { btn.style.background = '#f0f0f0'; btn.style.fontWeight = 'normal'; }
+        });
+      }
       if (mode !== 'dfa' && typeof dfaRunning !== 'undefined' && dfaRunning) dfaStopRun();
       if (mode !== 'dpda' && typeof dpdaRunning !== 'undefined' && dpdaRunning) dpdaStopRun();
       if (mode !== 'dpda') { var _sf = document.getElementById('dpda-stack-float'); if (_sf) _sf.style.display = 'none'; }
@@ -274,8 +280,6 @@
       if (typeof dpdaStack !== 'undefined') dpdaStack = [];
       var tapeEl = document.getElementById('dpda-tape');
       if (tapeEl) { tapeEl.innerHTML = ''; tapeEl.style.display = 'none'; }
-      var tapeInput = document.getElementById('dpda-tape-input');
-      if (tapeInput) tapeInput.style.display = '';
       var sc = document.getElementById('dpda-stack-float');
       if (sc) sc.style.display = 'none';
       if (typeof draw === 'function') draw();
@@ -400,16 +404,15 @@
       </canvas>
       <div id="sim-panel" style="background:white;border-radius:20px;padding:20px;max-width:1200px;width:100%;box-sizing:border-box;">
         <div style="display:flex;gap:6px;align-items:center;">
-          <button id="mode-tm-btn" onclick="setSimMode('tm')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:12pt;font-weight:bold;">Turing Machine</button>
           <button id="mode-dfa-btn" onclick="setSimMode('dfa')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:12pt;font-weight:normal;">DFA</button>
           <button id="mode-dpda-btn" onclick="setSimMode('dpda')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:12pt;font-weight:normal;">DPDA</button>
+          <button id="mode-tm-input-btn" onclick="setSimMode('tm','input')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:12pt;font-weight:bold;">TM Accepting Languages</button>
+          <button id="mode-tm-args-btn" onclick="setSimMode('tm','args')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:12pt;font-weight:normal;">TM Calculating Functions</button>
         </div>
         <div id="sim-panel-content" style="margin-top:14px;">
         <div id="tm-sim-section">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
             <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <label style="cursor:pointer;"><input type="radio" name="tm-input-mode" value="input" checked onchange="tmUpdateInputPlaceholder()"> Language</label>
-              <label style="cursor:pointer;"><input type="radio" name="tm-input-mode" value="args" onchange="tmUpdateInputPlaceholder()"> Function</label>
               <input id="tm-input" type="text" placeholder="ε" style="font-family:monospace;font-size:13px;width:180px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"/>
             </span>
             <label id="tm-result-label" style="display:none;">Result:&nbsp;<input id="tm-result" type="text" readonly style="font-family:monospace;font-size:13px;width:120px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;"/></label>
@@ -434,6 +437,11 @@
         </div>
         <div id="dfa-sim-section" style="display:none">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+            <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <input id="dfa-tape-input" type="text" placeholder="type input word here, empty for ε"
+                style="font-family:monospace;font-size:13px;width:220px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"
+                onkeydown="if(event.key==='Enter') dfaInit();"/>
+            </span>
             <span style="display:flex;align-items:center;gap:10px;margin-left:auto;">
               <button onclick="dfaClearSim()" title="Clear input &amp; simulation" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#x2715;</button>
               <button onclick="dfaInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
@@ -450,14 +458,16 @@
           </div>
           <div id="dfa-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
           <div style="overflow-x:auto;">
-            <input id="dfa-tape-input" type="text" placeholder="type input word here, empty for ε"
-              style="font-family:monospace;font-size:18px;padding:8px 12px;border:1px solid #bbb;border-radius:4px;width:100%;box-sizing:border-box;background:#f9f9f9;height:52px;"
-              onkeydown="if(event.key==='Enter') dfaInit();"/>
             <div id="dfa-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;flex-wrap:nowrap;"></div>
           </div>
         </div>
         <div id="dpda-sim-section" style="display:none">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+            <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <input id="dpda-tape-input" type="text" placeholder="type input word here, empty for ε"
+                style="font-family:monospace;font-size:13px;width:220px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"
+                onkeydown="if(event.key==='Enter') dpdaInit();"/>
+            </span>
             <span style="display:flex;align-items:center;gap:10px;margin-left:auto;">
               <button onclick="dpdaClearSim()" title="Clear input &amp; simulation" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#x2715;</button>
               <button onclick="dpdaInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
@@ -474,9 +484,6 @@
           </div>
           <div id="dpda-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
           <div style="overflow-x:auto;">
-            <input id="dpda-tape-input" type="text" placeholder="type input word here, empty for ε"
-              style="font-family:monospace;font-size:18px;padding:8px 12px;border:1px solid #bbb;border-radius:4px;width:100%;box-sizing:border-box;background:#f9f9f9;height:52px;"
-              onkeydown="if(event.key==='Enter') dpdaInit();"/>
             <div id="dpda-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;flex-wrap:nowrap;"></div>
           </div>
         </div>

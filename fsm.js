@@ -1136,6 +1136,7 @@ var tmLinkTimer = null;
 var tmStepCount = 0;
 var tmInvalidLinks = [];
 var tmHistory = [];
+var tmInputMode = 'input';
 var selectedNodes = [];
 var lastDragMouse = null;
 var selectionRect = null;
@@ -2056,11 +2057,19 @@ function tmConvertArgs(input) {
     }).join('#');
 }
 
+function tmSetInputMode(mode) {
+    tmInputMode = mode;
+    var inputBtn = document.getElementById('mode-tm-input-btn');
+    var argsBtn = document.getElementById('mode-tm-args-btn');
+    if (inputBtn) { inputBtn.style.background = mode === 'input' ? '#d0e4f7' : '#f0f0f0'; inputBtn.style.fontWeight = mode === 'input' ? 'bold' : 'normal'; }
+    if (argsBtn) { argsBtn.style.background = mode === 'args' ? '#d0e4f7' : '#f0f0f0'; argsBtn.style.fontWeight = mode === 'args' ? 'bold' : 'normal'; }
+    tmUpdateInputPlaceholder();
+}
+
 function tmUpdateInputPlaceholder() {
-    var mode = document.querySelector('input[name="tm-input-mode"]:checked');
     var el = document.getElementById('tm-input');
     var resultLabel = document.getElementById('tm-result-label');
-    var isArgs = mode && mode.value === 'args';
+    var isArgs = tmInputMode === 'args';
     if (el) el.placeholder = isArgs ? 'e.g. 3,0,2' : 'ε';
     if (resultLabel) resultLabel.style.display = isArgs ? '' : 'none';
 }
@@ -2082,8 +2091,7 @@ function tmDecodeResult() {
 }
 
 function tmUpdateResult() {
-    var modeEl = document.querySelector('input[name="tm-input-mode"]:checked');
-    if (!modeEl || modeEl.value !== 'args') return;
+    if (tmInputMode !== 'args') return;
     var resultEl = document.getElementById('tm-result');
     if (resultEl) resultEl.value = tmDecodeResult();
 }
@@ -2155,14 +2163,12 @@ function tmInit() {
     tmAcceptStates = prog.acceptStates;
     tmTransitions = prog.transitions;
     var writesDollar = Object.keys(tmTransitions).some(function(k) { return tmTransitions[k].write === '$'; });
-    var modeRadio = document.querySelector('input[name="tm-input-mode"][value="' + (writesDollar ? 'args' : 'input') + '"]');
-    if (modeRadio) { modeRadio.checked = true; tmUpdateInputPlaceholder(); }
+    tmSetInputMode(writesDollar ? 'args' : 'input');
     tmHalted = false;
     tmHistory = [];
     tmStopRun();
     var rawInput = document.getElementById('tm-input').value;
-    var modeEl = document.querySelector('input[name="tm-input-mode"]:checked');
-    var input = (modeEl && modeEl.value === 'args') ? tmConvertArgs(rawInput) : rawInput;
+    var input = (tmInputMode === 'args') ? tmConvertArgs(rawInput) : rawInput;
     var DASHV = String.fromCharCode(8867);
     tmTape = [DASHV].concat(input.length > 0 ? input.split('') : ['_']);
     tmHead = 1;
@@ -2474,8 +2480,6 @@ function dfaInit() {
     dfaStepCount = 0;
     document.getElementById('dfa-step-counter').textContent = 'Steps: 0';
     document.getElementById('dfa-status').textContent = 'State: ' + dfaState;
-    var tapeInput = document.getElementById('dfa-tape-input');
-    if (tapeInput) tapeInput.style.display = 'none';
     var tapeEl = document.getElementById('dfa-tape');
     if (tapeEl) tapeEl.style.display = 'flex';
     dfaRender();
@@ -2809,7 +2813,6 @@ function dpdaInit() {
     dpdaStepCount = 0;
     document.getElementById('dpda-step-counter').textContent = 'Steps: 0';
     if (statusEl) statusEl.textContent = 'State: ' + dpdaState;
-    document.getElementById('dpda-tape-input').style.display = 'none';
     document.getElementById('dpda-tape').style.display = 'flex';
     var sc = document.getElementById('dpda-stack-float');
     if (sc) sc.style.display = 'block';
