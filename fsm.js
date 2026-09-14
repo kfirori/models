@@ -1137,6 +1137,27 @@ var tmStepCount = 0;
 var tmInvalidLinks = [];
 var tmHistory = [];
 var tmInputMode = 'input';
+
+function tmSetControlsEnabled(enabled) {
+    ['tm-rewind-btn', 'tm-stepback-btn', 'tm-step-btn', 'tm-run-btn', 'tm-speed'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.disabled = !enabled;
+    });
+}
+
+function dfaSetControlsEnabled(enabled) {
+    ['dfa-rewind-btn', 'dfa-stepback-btn', 'dfa-step-btn', 'dfa-run-btn', 'dfa-speed'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.disabled = !enabled;
+    });
+}
+
+function dpdaSetControlsEnabled(enabled) {
+    ['dpda-rewind-btn', 'dpda-stepback-btn', 'dpda-step-btn', 'dpda-run-btn', 'dpda-speed'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.disabled = !enabled;
+    });
+}
 var selectedNodes = [];
 var lastDragMouse = null;
 var selectionRect = null;
@@ -2034,6 +2055,25 @@ function tmStepBack() {
     draw();
 }
 
+function tmRewind() {
+    if (tmHistory.length === 0) return;
+    if (tmRunning) tmStopRun();
+    var first = tmHistory[0];
+    tmTape = first.tape;
+    tmHead = first.head;
+    tmState = first.state;
+    tmStepCount = first.stepCount;
+    tmHalted = first.halted;
+    tmHistory = [];
+    tmCurrentNode = tmNodeForState(tmState);
+    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+    tmCurrentLink = null;
+    document.getElementById('tm-step-counter').textContent = 'Steps: ' + tmStepCount;
+    document.getElementById('tm-status').textContent = 'State: ' + tmState;
+    tmRender();
+    draw();
+}
+
 function tmShowSpeedTooltip(slider) {
     var tooltip = document.getElementById('tm-speed-tooltip');
     if (!tooltip) return;
@@ -2179,6 +2219,11 @@ function tmInit() {
     document.getElementById('tm-status').textContent = 'State: ' + tmState;
     var resultEl = document.getElementById('tm-result');
     if (resultEl) resultEl.value = '';
+    var tapeEl = document.getElementById('tm-tape');
+    if (tapeEl) tapeEl.style.display = 'flex';
+    var loadXBtn = document.getElementById('tm-load-x-btn');
+    if (loadXBtn) loadXBtn.style.display = 'inline-flex';
+    tmSetControlsEnabled(true);
     tmRender();
     draw();
 }
@@ -2482,6 +2527,9 @@ function dfaInit() {
     document.getElementById('dfa-status').textContent = 'State: ' + dfaState;
     var tapeEl = document.getElementById('dfa-tape');
     if (tapeEl) tapeEl.style.display = 'flex';
+    var loadXBtn = document.getElementById('dfa-load-x-btn');
+    if (loadXBtn) loadXBtn.style.display = 'inline-flex';
+    dfaSetControlsEnabled(true);
     dfaRender();
     draw();
 }
@@ -2550,6 +2598,26 @@ function dfaStepBack() {
     dfaStepCount = prev.stepCount;
     dfaHalted = prev.halted;
     dfaAccepted = prev.accepted;
+    tmCurrentNode = dfaNodeForState(dfaState);
+    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+    tmCurrentLink = null;
+    document.getElementById('dfa-step-counter').textContent = 'Steps: ' + dfaStepCount;
+    document.getElementById('dfa-status').textContent = 'State: ' + dfaState;
+    dfaRender();
+    draw();
+}
+
+function dfaRewind() {
+    if (dfaHistory.length === 0) return;
+    if (dfaRunning) dfaStopRun();
+    dfaStopBlink();
+    var first = dfaHistory[0];
+    dfaPosition = first.position;
+    dfaState = first.state;
+    dfaStepCount = first.stepCount;
+    dfaHalted = first.halted;
+    dfaAccepted = first.accepted;
+    dfaHistory = [];
     tmCurrentNode = dfaNodeForState(dfaState);
     if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
     tmCurrentLink = null;
@@ -2814,6 +2882,9 @@ function dpdaInit() {
     document.getElementById('dpda-step-counter').textContent = 'Steps: 0';
     if (statusEl) statusEl.textContent = 'State: ' + dpdaState;
     document.getElementById('dpda-tape').style.display = 'flex';
+    var dpdaLoadXBtn = document.getElementById('dpda-load-x-btn');
+    if (dpdaLoadXBtn) dpdaLoadXBtn.style.display = 'inline-flex';
+    dpdaSetControlsEnabled(true);
     var sc = document.getElementById('dpda-stack-float');
     if (sc) sc.style.display = 'block';
     dpdaPositionStackFloat();
@@ -2901,6 +2972,27 @@ function dpdaStepBack() {
     dpdaHalted = prev.halted;
     dpdaAccepted = prev.accepted;
     dpdaStack = prev.stack;
+    tmCurrentNode = dpdaNodeForState(dpdaState);
+    if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
+    tmCurrentLink = null;
+    document.getElementById('dpda-step-counter').textContent = 'Steps: ' + dpdaStepCount;
+    document.getElementById('dpda-status').textContent = 'State: ' + dpdaState;
+    dpdaRender();
+    draw();
+}
+
+function dpdaRewind() {
+    if (dpdaHistory.length === 0) return;
+    if (dpdaRunning) dpdaStopRun();
+    dpdaStopBlink();
+    var first = dpdaHistory[0];
+    dpdaPosition = first.position;
+    dpdaState = first.state;
+    dpdaStepCount = first.stepCount;
+    dpdaHalted = first.halted;
+    dpdaAccepted = first.accepted;
+    dpdaStack = first.stack;
+    dpdaHistory = [];
     tmCurrentNode = dpdaNodeForState(dpdaState);
     if (tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
     tmCurrentLink = null;

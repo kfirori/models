@@ -96,6 +96,37 @@
       padding: 10px 20px 0;
     }
 
+    .sim-load-arrow {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid #8fb8e0;
+      background: #d0e4f7;
+      cursor: pointer;
+      font-size: 15px;
+      color: #2a5a8a;
+    }
+
+    .sim-load-arrow:hover {
+      background: #bcdaf5;
+    }
+
+    .sim-load-x-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid #aaa;
+      cursor: pointer;
+      background: #f0f0f0;
+      font-size: 15px;
+    }
+
     .tab-btn {
       padding: 8px 20px;
       border: none;
@@ -196,9 +227,9 @@
       return 0.25 * Math.pow(512, val / 100);
     }
 
-    function tmClearSim() {
+    function tmClearSim(keepInput) {
       if (typeof tmRunning !== 'undefined' && tmRunning) tmStopRun();
-      document.getElementById('tm-input').value = '';
+      if (!keepInput) document.getElementById('tm-input').value = '';
       document.getElementById('tm-result').value = '';
       document.getElementById('tm-status').textContent = '';
       document.getElementById('tm-step-counter').textContent = 'Steps: 0';
@@ -206,6 +237,11 @@
       if (typeof tmCurrentNode !== 'undefined') tmCurrentNode = null;
       if (typeof tmCurrentLink !== 'undefined') tmCurrentLink = null;
       if (typeof tmHistory !== 'undefined') tmHistory = [];
+      var tapeEl = document.getElementById('tm-tape');
+      if (tapeEl) { tapeEl.innerHTML = ''; tapeEl.style.display = 'none'; }
+      var loadXBtn = document.getElementById('tm-load-x-btn');
+      if (loadXBtn) loadXBtn.style.display = 'none';
+      if (typeof tmSetControlsEnabled === 'function') tmSetControlsEnabled(false);
       if (typeof draw === 'function') draw();
     }
 
@@ -221,6 +257,9 @@
       if (typeof dfaHistory !== 'undefined') dfaHistory = [];
       var tapeEl = document.getElementById('dfa-tape');
       if (tapeEl) { tapeEl.innerHTML = ''; tapeEl.style.display = 'none'; }
+      var loadXBtn = document.getElementById('dfa-load-x-btn');
+      if (loadXBtn) loadXBtn.style.display = 'none';
+      if (typeof dfaSetControlsEnabled === 'function') dfaSetControlsEnabled(false);
       if (typeof draw === 'function') draw();
     }
 
@@ -280,6 +319,9 @@
       if (typeof dpdaStack !== 'undefined') dpdaStack = [];
       var tapeEl = document.getElementById('dpda-tape');
       if (tapeEl) { tapeEl.innerHTML = ''; tapeEl.style.display = 'none'; }
+      var loadXBtn = document.getElementById('dpda-load-x-btn');
+      if (loadXBtn) loadXBtn.style.display = 'none';
+      if (typeof dpdaSetControlsEnabled === 'function') dpdaSetControlsEnabled(false);
       var sc = document.getElementById('dpda-stack-float');
       if (sc) sc.style.display = 'none';
       if (typeof draw === 'function') draw();
@@ -417,22 +459,25 @@
             </span>
             <label id="tm-result-label" style="display:none;">Result:&nbsp;<input id="tm-result" type="text" readonly style="font-family:monospace;font-size:13px;width:120px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;"/></label>
             <span style="display:flex;align-items:center;gap:10px;margin-left:auto;">
-              <button onclick="tmClearSim()" title="Clear input &amp; simulation" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#x2715;</button>
-              <button onclick="tmInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
-              <button onclick="tmStepBack()" title="Step back" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
-              <button onclick="tmStep()" title="Step" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
-              <button id="tm-run-btn" onclick="tmToggleRun()" title="Run" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
+              <button id="tm-rewind-btn" onclick="tmRewind()" title="Rewind to start" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9194;</button>
+              <button id="tm-stepback-btn" onclick="tmStepBack()" title="Step back" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
+              <button id="tm-step-btn" onclick="tmStep()" title="Step" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
+              <button id="tm-run-btn" onclick="tmToggleRun()" title="Run" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
               <label>Speed:&nbsp;<span style="position:relative;display:inline-block;vertical-align:middle;">
-                <input id="tm-speed" type="range" min="0" max="100" value="50" style="width:70px;"
+                <input id="tm-speed" type="range" min="0" max="100" value="50" disabled style="width:70px;"
                   oninput="tmShowSpeedTooltip(this)" onmouseup="tmHideSpeedTooltip()" ontouchend="tmHideSpeedTooltip()"/>
                 <span id="tm-speed-tooltip" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:#333;color:#fff;font-size:11px;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);"></span>
               </span></label>
               <span id="tm-step-counter" style="font-family:monospace;font-size:13px;">Steps: 0</span>
             </span>
           </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <button class="sim-load-arrow" onclick="tmInit()" title="Load input &amp; reset simulation">&#11015;</button>
+            <button id="tm-load-x-btn" class="sim-load-x-btn" onclick="tmClearSim(true)" title="Clear &amp; hide tape" style="display:none;">&#x2715;</button>
+          </div>
           <div id="tm-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
           <div style="overflow-x:auto;">
-            <div id="tm-tape" style="display:flex;gap:3px;padding:4px 0;min-height:50px;align-items:center;"></div>
+            <div id="tm-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;"></div>
           </div>
         </div>
         <div id="dfa-sim-section" style="display:none">
@@ -443,18 +488,21 @@
                 onkeydown="if(event.key==='Enter') dfaInit();"/>
             </span>
             <span style="display:flex;align-items:center;gap:10px;margin-left:auto;">
-              <button onclick="dfaClearSim()" title="Clear input &amp; simulation" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#x2715;</button>
-              <button onclick="dfaInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
-              <button onclick="dfaStepBack()" title="Step back" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
-              <button onclick="dfaStep()" title="Step" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
-              <button id="dfa-run-btn" onclick="dfaToggleRun()" title="Run" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
+              <button id="dfa-rewind-btn" onclick="dfaRewind()" title="Rewind to start" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9194;</button>
+              <button id="dfa-stepback-btn" onclick="dfaStepBack()" title="Step back" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
+              <button id="dfa-step-btn" onclick="dfaStep()" title="Step" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
+              <button id="dfa-run-btn" onclick="dfaToggleRun()" title="Run" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
               <label>Speed:&nbsp;<span style="position:relative;display:inline-block;vertical-align:middle;">
-                <input id="dfa-speed" type="range" min="0" max="100" value="50" style="width:70px;"
+                <input id="dfa-speed" type="range" min="0" max="100" value="50" disabled style="width:70px;"
                   oninput="dfaShowSpeedTooltip(this)" onmouseup="dfaHideSpeedTooltip()" ontouchend="dfaHideSpeedTooltip()"/>
                 <span id="dfa-speed-tooltip" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:#333;color:#fff;font-size:11px;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);"></span>
               </span></label>
               <span id="dfa-step-counter" style="font-family:monospace;font-size:13px;">Steps: 0</span>
             </span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <button class="sim-load-arrow" onclick="dfaInit()" title="Load input &amp; reset simulation">&#11015;</button>
+            <button id="dfa-load-x-btn" class="sim-load-x-btn" onclick="dfaClearSim()" title="Clear &amp; hide tape" style="display:none;">&#x2715;</button>
           </div>
           <div id="dfa-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
           <div style="overflow-x:auto;">
@@ -469,18 +517,21 @@
                 onkeydown="if(event.key==='Enter') dpdaInit();"/>
             </span>
             <span style="display:flex;align-items:center;gap:10px;margin-left:auto;">
-              <button onclick="dpdaClearSim()" title="Clear input &amp; simulation" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#x2715;</button>
-              <button onclick="dpdaInit()" title="Load &amp; Reset" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#8634;</button>
-              <button onclick="dpdaStepBack()" title="Step back" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
-              <button onclick="dpdaStep()" title="Step" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
-              <button id="dpda-run-btn" onclick="dpdaToggleRun()" title="Run" style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
+              <button id="dpda-rewind-btn" onclick="dpdaRewind()" title="Rewind to start" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9194;</button>
+              <button id="dpda-stepback-btn" onclick="dpdaStepBack()" title="Step back" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9198;</button>
+              <button id="dpda-step-btn" onclick="dpdaStep()" title="Step" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9197;</button>
+              <button id="dpda-run-btn" onclick="dpdaToggleRun()" title="Run" disabled style="padding:4px 10px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-size:16px;">&#9654;</button>
               <label>Speed:&nbsp;<span style="position:relative;display:inline-block;vertical-align:middle;">
-                <input id="dpda-speed" type="range" min="0" max="100" value="50" style="width:70px;"
+                <input id="dpda-speed" type="range" min="0" max="100" value="50" disabled style="width:70px;"
                   oninput="dpdaShowSpeedTooltip(this)" onmouseup="dpdaHideSpeedTooltip()" ontouchend="dpdaHideSpeedTooltip()"/>
                 <span id="dpda-speed-tooltip" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:#333;color:#fff;font-size:11px;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);"></span>
               </span></label>
               <span id="dpda-step-counter" style="font-family:monospace;font-size:13px;">Steps: 0</span>
             </span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <button class="sim-load-arrow" onclick="dpdaInit()" title="Load input &amp; reset simulation">&#11015;</button>
+            <button id="dpda-load-x-btn" class="sim-load-x-btn" onclick="dpdaClearSim()" title="Clear &amp; hide tape" style="display:none;">&#x2715;</button>
           </div>
           <div id="dpda-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
           <div style="overflow-x:auto;">
