@@ -1163,6 +1163,59 @@ var lastDragMouse = null;
 var selectionRect = null;
 
 var simMode = 'tm';
+var testMode = false;
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function(c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+}
+
+function chipStyle(status) {
+    if (status === 'pass') return 'background:#e8f5e9;border:1px solid #a5d6a7;color:#1b5e20;';
+    if (status === 'timeout') return 'background:#fff3e0;border:1px solid #ffcc80;color:#e65100;';
+    return 'background:#ffebee;border:1px solid #ef9a9a;color:#b71c1c;';
+}
+
+function chipMark(status) {
+    if (status === 'pass') return '&#10003;';
+    if (status === 'timeout') return '?';
+    return '&#10007;';
+}
+
+function renderWordChips(containerId, words, statuses) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    if (words.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = words.map(function(w, i) {
+        var display = w === '' ? '&#949;' : escapeHtml(w);
+        var title = statuses[i] === 'timeout' ? ' title="Did not halt within step limit"' : '';
+        return '<span' + title + ' style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;margin:3px 6px 0 0;border-radius:14px;font-family:monospace;font-size:13px;' +
+            chipStyle(statuses[i]) + '">' + display + '<b>' + chipMark(statuses[i]) + '</b></span>';
+    }).join('');
+}
+
+function renderTestSummary(containerId, acceptStatuses, rejectStatuses) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    var allStatuses = acceptStatuses.concat(rejectStatuses);
+    var total = allStatuses.length;
+    if (total === 0) { el.textContent = ''; return; }
+    var passCount = allStatuses.filter(function(s) { return s === 'pass'; }).length;
+    el.textContent = passCount + ' / ' + total + ' passed';
+}
+
+function testWordsFromInput(id) {
+    var el = document.getElementById(id);
+    if (!el) return [];
+    return el.value.split(',')
+        .map(function(s) { return s.trim(); })
+        .filter(function(s) { return s.length > 0; })
+        .map(function(s) {
+            var lower = s.toLowerCase();
+            return (s === 'ε' || lower === 'eps' || lower === 'epsilon') ? '' : s;
+        });
+}
 var dfaInput = '';
 var dfaPosition = 0;
 var dfaState = null;
@@ -2228,6 +2281,59 @@ function tmInit() {
     draw();
 }
 
+function tmTestWord(word, prog) {
+    var DASHV = String.fromCharCode(8867);
+    var tape = [DASHV].concat(word.length > 0 ? word.split('') : ['_']);
+    var head = 1;
+    var state = prog.initialState;
+    var steps = 0;
+    var MAX_STEPS = 20000;
+    while (steps < MAX_STEPS) {
+        var cell = (head >= 0 && head < tape.length) ? tape[head] : '_';
+        if (!cell) cell = '_';
+        var trans = prog.transitions[state + '|' + cell];
+        if (!trans) return prog.acceptStates.indexOf(state) !== -1 ? 'accept' : 'reject';
+        if (head === 0 && trans.write !== DASHV) return 'reject';
+        if (trans.dir === 'l' && head === 0) return 'reject';
+        tape[head] = trans.write;
+        if (trans.dir === 'r') { head++; if (head >= tape.length) tape.push('_'); }
+        else if (trans.dir === 'l') { head--; }
+        state = trans.to;
+        if (prog.acceptStates.length > 0 && prog.acceptStates.indexOf(state) !== -1) return 'accept';
+        steps++;
+    }
+    return 'timeout';
+}
+
+function tmRunTest() {
+    var errors = tmCompile();
+    draw();
+    var summaryEl = document.getElementById('tm-test-summary');
+    if (!summaryEl) return;
+    if (errors.length > 0) {
+        summaryEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
+        renderWordChips('tm-test-accept-results', [], []);
+        renderWordChips('tm-test-reject-results', [], []);
+        return;
+    }
+    var prog = parseTuringProgram();
+    var isArgs = tmInputMode === 'args';
+    function toInput(w) { return isArgs ? tmConvertArgs(w) : w; }
+    var acceptWords = testWordsFromInput('tm-test-accept');
+    var rejectWords = testWordsFromInput('tm-test-reject');
+    var acceptStatuses = acceptWords.map(function(w) {
+        var r = tmTestWord(toInput(w), prog);
+        return r === 'timeout' ? 'timeout' : (r === 'accept' ? 'pass' : 'fail');
+    });
+    var rejectStatuses = rejectWords.map(function(w) {
+        var r = tmTestWord(toInput(w), prog);
+        return r === 'timeout' ? 'timeout' : (r === 'reject' ? 'pass' : 'fail');
+    });
+    renderWordChips('tm-test-accept-results', acceptWords, acceptStatuses);
+    renderWordChips('tm-test-reject-results', rejectWords, rejectStatuses);
+    renderTestSummary('tm-test-summary', acceptStatuses, rejectStatuses);
+}
+
 function tmStep() {
     if (tmHalted || tmState === null) return;
     tmSaveHistory();
@@ -2532,6 +2638,37 @@ function dfaInit() {
     dfaSetControlsEnabled(true);
     dfaRender();
     draw();
+}
+
+function dfaTestWord(word, prog) {
+    var state = prog.initialState;
+    for (var i = 0; i < word.length; i++) {
+        var trans = prog.transitions[state + '|' + word[i]];
+        if (!trans) return 'reject';
+        state = trans.to;
+    }
+    return prog.acceptStates.indexOf(state) !== -1 ? 'accept' : 'reject';
+}
+
+function dfaRunTest() {
+    var errors = dfaCompile();
+    draw();
+    var summaryEl = document.getElementById('dfa-test-summary');
+    if (!summaryEl) return;
+    if (errors.length > 0) {
+        summaryEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
+        renderWordChips('dfa-test-accept-results', [], []);
+        renderWordChips('dfa-test-reject-results', [], []);
+        return;
+    }
+    var prog = parseDfaProgram();
+    var acceptWords = testWordsFromInput('dfa-test-accept');
+    var rejectWords = testWordsFromInput('dfa-test-reject');
+    var acceptStatuses = acceptWords.map(function(w) { return dfaTestWord(w, prog) === 'accept' ? 'pass' : 'fail'; });
+    var rejectStatuses = rejectWords.map(function(w) { return dfaTestWord(w, prog) === 'reject' ? 'pass' : 'fail'; });
+    renderWordChips('dfa-test-accept-results', acceptWords, acceptStatuses);
+    renderWordChips('dfa-test-reject-results', rejectWords, rejectStatuses);
+    renderTestSummary('dfa-test-summary', acceptStatuses, rejectStatuses);
 }
 
 function dfaStep() {
@@ -2890,6 +3027,54 @@ function dpdaInit() {
     dpdaPositionStackFloat();
     dpdaRender();
     draw();
+}
+
+function dpdaApplyOpPure(op, stack, matchedStackSym) {
+    var newStack = stack.slice();
+    if (op.type === 'noop') return newStack;
+    if (op.type === 'pop') { if (matchedStackSym !== '\\estack') newStack.pop(); return newStack; }
+    if (op.type === 'push') { for (var i = 0; i < op.symbols.length; i++) newStack.push(op.symbols[i]); return newStack; }
+    return newStack;
+}
+
+function dpdaTestWord(word, prog) {
+    var state = prog.initialState;
+    var stack = [];
+    for (var i = 0; i < word.length; i++) {
+        var stackTop = stack.length === 0 ? '\\estack' : stack[stack.length - 1];
+        var trans = prog.transitions[state + '|' + word[i] + '|' + stackTop];
+        if (!trans) return 'reject';
+        stack = dpdaApplyOpPure(trans.op, stack, stackTop);
+        state = trans.to;
+    }
+    return prog.acceptStates.indexOf(state) !== -1 ? 'accept' : 'reject';
+}
+
+function dpdaRunTest() {
+    var errors = dpdaCompile();
+    draw();
+    var summaryEl = document.getElementById('dpda-test-summary');
+    if (!summaryEl) return;
+    if (errors.length > 0) {
+        summaryEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
+        renderWordChips('dpda-test-accept-results', [], []);
+        renderWordChips('dpda-test-reject-results', [], []);
+        return;
+    }
+    var prog = parseDpdaProgram(errors);
+    if (errors.length > 0) {
+        summaryEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
+        renderWordChips('dpda-test-accept-results', [], []);
+        renderWordChips('dpda-test-reject-results', [], []);
+        return;
+    }
+    var acceptWords = testWordsFromInput('dpda-test-accept');
+    var rejectWords = testWordsFromInput('dpda-test-reject');
+    var acceptStatuses = acceptWords.map(function(w) { return dpdaTestWord(w, prog) === 'accept' ? 'pass' : 'fail'; });
+    var rejectStatuses = rejectWords.map(function(w) { return dpdaTestWord(w, prog) === 'reject' ? 'pass' : 'fail'; });
+    renderWordChips('dpda-test-accept-results', acceptWords, acceptStatuses);
+    renderWordChips('dpda-test-reject-results', rejectWords, rejectStatuses);
+    renderTestSummary('dpda-test-summary', acceptStatuses, rejectStatuses);
 }
 
 function dpdaPositionStackFloat() {

@@ -179,7 +179,7 @@
       text-align: left;
     }
 
-    textarea {
+    #output {
       display: none;
       height: 200px;
     }
@@ -304,6 +304,25 @@
       if (typeof tmInvalidLinks !== 'undefined') tmInvalidLinks = [];
       if (typeof tmLinkTimer !== 'undefined' && tmLinkTimer) { clearTimeout(tmLinkTimer); tmLinkTimer = null; }
       if (typeof draw === 'function') draw();
+    }
+
+    function setTestMode(enabled) {
+      if (typeof testMode !== 'undefined') testMode = enabled;
+      ['tm', 'dfa', 'dpda'].forEach(function(t) {
+        var sim = document.getElementById(t + '-simulate-view');
+        var test = document.getElementById(t + '-test-view');
+        if (sim) sim.style.display = enabled ? 'none' : '';
+        if (test) test.style.display = enabled ? '' : 'none';
+      });
+      var simBtn = document.getElementById('mode-sim-btn');
+      var testBtn = document.getElementById('mode-test-btn');
+      if (simBtn) { simBtn.style.background = enabled ? '#f0f0f0' : '#d0e4f7'; simBtn.style.fontWeight = enabled ? 'normal' : 'bold'; }
+      if (testBtn) { testBtn.style.background = enabled ? '#d0e4f7' : '#f0f0f0'; testBtn.style.fontWeight = enabled ? 'bold' : 'normal'; }
+      if (enabled) {
+        if (typeof tmRunning !== 'undefined' && tmRunning) tmStopRun();
+        if (typeof dfaRunning !== 'undefined' && dfaRunning) dfaStopRun();
+        if (typeof dpdaRunning !== 'undefined' && dpdaRunning) dpdaStopRun();
+      }
     }
 
     function dpdaClearSim() {
@@ -450,9 +469,14 @@
           <button id="mode-dpda-btn" onclick="setSimMode('dpda')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:12pt;font-weight:normal;">DPDA</button>
           <button id="mode-tm-input-btn" onclick="setSimMode('tm','input')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:12pt;font-weight:bold;">TM Accepting Languages</button>
           <button id="mode-tm-args-btn" onclick="setSimMode('tm','args')" style="padding:5px 16px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:12pt;font-weight:normal;">TM Calculating Functions</button>
+          <span style="display:flex;gap:4px;margin-left:auto;">
+            <button id="mode-sim-btn" onclick="setTestMode(false)" style="padding:5px 14px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:11pt;font-weight:bold;">Simulation</button>
+            <button id="mode-test-btn" onclick="setTestMode(true)" style="padding:5px 14px;border-radius:6px;border:1px solid #aaa;cursor:pointer;background:#f0f0f0;font-family:inherit;font-size:11pt;font-weight:normal;">Test</button>
+          </span>
         </div>
         <div id="sim-panel-content" style="margin-top:14px;">
         <div id="tm-sim-section">
+          <div id="tm-simulate-view">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
             <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <input id="tm-input" type="text" placeholder="ε" style="font-family:monospace;font-size:13px;width:180px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;"/>
@@ -479,8 +503,26 @@
           <div style="overflow-x:auto;">
             <div id="tm-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;"></div>
           </div>
+          </div>
+          <div id="tm-test-view" style="display:none;">
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+              <div style="flex:1;min-width:260px;">
+                <label style="display:block;font-size:12px;font-weight:bold;color:#2e7d32;margin-bottom:4px;">Words expected to be ACCEPTED (comma-separated)</label>
+                <input id="tm-test-accept" type="text" placeholder="e.g. ab, aabb, ε" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
+                <div id="tm-test-accept-results" style="margin-top:8px;"></div>
+              </div>
+              <div style="flex:1;min-width:260px;">
+                <label style="display:block;font-size:12px;font-weight:bold;color:#c62828;margin-bottom:4px;">Words expected to be REJECTED (comma-separated)</label>
+                <input id="tm-test-reject" type="text" placeholder="e.g. a, b, aab" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
+                <div id="tm-test-reject-results" style="margin-top:8px;"></div>
+              </div>
+            </div>
+            <button onclick="tmRunTest()" style="padding:6px 16px;border-radius:6px;border:1px solid #8fb8e0;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:13px;font-weight:bold;">Run Test</button>
+            <div id="tm-test-summary" style="margin-top:10px;font-family:monospace;font-size:13px;font-weight:bold;"></div>
+          </div>
         </div>
         <div id="dfa-sim-section" style="display:none">
+          <div id="dfa-simulate-view">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
             <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <input id="dfa-tape-input" type="text" placeholder="type input word here, empty for ε"
@@ -508,8 +550,26 @@
           <div style="overflow-x:auto;">
             <div id="dfa-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;flex-wrap:nowrap;"></div>
           </div>
+          </div>
+          <div id="dfa-test-view" style="display:none;">
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+              <div style="flex:1;min-width:260px;">
+                <label style="display:block;font-size:12px;font-weight:bold;color:#2e7d32;margin-bottom:4px;">Words expected to be ACCEPTED (comma-separated)</label>
+                <input id="dfa-test-accept" type="text" placeholder="e.g. ab, aabb, ε" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
+                <div id="dfa-test-accept-results" style="margin-top:8px;"></div>
+              </div>
+              <div style="flex:1;min-width:260px;">
+                <label style="display:block;font-size:12px;font-weight:bold;color:#c62828;margin-bottom:4px;">Words expected to be REJECTED (comma-separated)</label>
+                <input id="dfa-test-reject" type="text" placeholder="e.g. a, b, aab" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
+                <div id="dfa-test-reject-results" style="margin-top:8px;"></div>
+              </div>
+            </div>
+            <button onclick="dfaRunTest()" style="padding:6px 16px;border-radius:6px;border:1px solid #8fb8e0;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:13px;font-weight:bold;">Run Test</button>
+            <div id="dfa-test-summary" style="margin-top:10px;font-family:monospace;font-size:13px;font-weight:bold;"></div>
+          </div>
         </div>
         <div id="dpda-sim-section" style="display:none">
+          <div id="dpda-simulate-view">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
             <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <input id="dpda-tape-input" type="text" placeholder="type input word here, empty for ε"
@@ -536,6 +596,23 @@
           <div id="dpda-status" style="font-family:monospace;font-size:14px;min-height:20px;margin-bottom:8px;"></div>
           <div style="overflow-x:auto;">
             <div id="dpda-tape" style="display:none;gap:3px;padding:4px 0;min-height:50px;align-items:center;flex-wrap:nowrap;"></div>
+          </div>
+          </div>
+          <div id="dpda-test-view" style="display:none;">
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+              <div style="flex:1;min-width:260px;">
+                <label style="display:block;font-size:12px;font-weight:bold;color:#2e7d32;margin-bottom:4px;">Words expected to be ACCEPTED (comma-separated)</label>
+                <input id="dpda-test-accept" type="text" placeholder="e.g. ab, aabb, ε" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
+                <div id="dpda-test-accept-results" style="margin-top:8px;"></div>
+              </div>
+              <div style="flex:1;min-width:260px;">
+                <label style="display:block;font-size:12px;font-weight:bold;color:#c62828;margin-bottom:4px;">Words expected to be REJECTED (comma-separated)</label>
+                <input id="dpda-test-reject" type="text" placeholder="e.g. a, b, aab" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
+                <div id="dpda-test-reject-results" style="margin-top:8px;"></div>
+              </div>
+            </div>
+            <button onclick="dpdaRunTest()" style="padding:6px 16px;border-radius:6px;border:1px solid #8fb8e0;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:13px;font-weight:bold;">Run Test</button>
+            <div id="dpda-test-summary" style="margin-top:10px;font-family:monospace;font-size:13px;font-weight:bold;"></div>
           </div>
         </div>
         </div>
