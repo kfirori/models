@@ -1162,7 +1162,7 @@ var selectedNodes = [];
 var lastDragMouse = null;
 var selectionRect = null;
 
-var simMode = 'tm';
+var simMode = 'dfa';
 var testMode = false;
 
 function escapeHtml(s) {
@@ -1183,16 +1183,36 @@ function chipMark(status) {
     return '&#10007;';
 }
 
-function renderWordChips(containerId, words, statuses) {
+function renderWordChips(containerId, words, statuses, type) {
     var el = document.getElementById(containerId);
     if (!el) return;
     if (words.length === 0) { el.innerHTML = ''; return; }
     el.innerHTML = words.map(function(w, i) {
         var display = w === '' ? '&#949;' : escapeHtml(w);
-        var title = statuses[i] === 'timeout' ? ' title="Did not halt within step limit"' : '';
-        return '<span' + title + ' style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;margin:3px 6px 0 0;border-radius:14px;font-family:monospace;font-size:13px;' +
+        var title = statuses[i] === 'timeout' ? 'Did not halt within step limit — ' : '';
+        return '<span data-type="' + type + '" data-word="' + escapeHtml(w) + '" ondblclick="testWordDblClick(this)" title="' + title + 'Double-click to load in Simulation" ' +
+            'style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;margin:3px 6px 0 0;border-radius:14px;font-family:monospace;font-size:13px;cursor:pointer;' +
             chipStyle(statuses[i]) + '">' + display + '<b>' + chipMark(statuses[i]) + '</b></span>';
     }).join('');
+}
+
+function testWordDblClick(el) {
+    var type = el.getAttribute('data-type');
+    var word = el.getAttribute('data-word');
+    setTestMode(false);
+    if (type === 'tm') {
+        setSimMode('tm', tmInputMode);
+        document.getElementById('tm-input').value = word;
+        tmInit();
+    } else if (type === 'dfa') {
+        setSimMode('dfa');
+        document.getElementById('dfa-tape-input').value = word;
+        dfaInit();
+    } else if (type === 'dpda') {
+        setSimMode('dpda');
+        document.getElementById('dpda-tape-input').value = word;
+        dpdaInit();
+    }
 }
 
 function renderTestSummary(containerId, acceptStatuses, rejectStatuses) {
@@ -2312,8 +2332,8 @@ function tmRunTest() {
     if (!summaryEl) return;
     if (errors.length > 0) {
         summaryEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
-        renderWordChips('tm-test-accept-results', [], []);
-        renderWordChips('tm-test-reject-results', [], []);
+        renderWordChips('tm-test-accept-results', [], [], 'tm');
+        renderWordChips('tm-test-reject-results', [], [], 'tm');
         return;
     }
     var prog = parseTuringProgram();
@@ -2329,8 +2349,8 @@ function tmRunTest() {
         var r = tmTestWord(toInput(w), prog);
         return r === 'timeout' ? 'timeout' : (r === 'reject' ? 'pass' : 'fail');
     });
-    renderWordChips('tm-test-accept-results', acceptWords, acceptStatuses);
-    renderWordChips('tm-test-reject-results', rejectWords, rejectStatuses);
+    renderWordChips('tm-test-accept-results', acceptWords, acceptStatuses, 'tm');
+    renderWordChips('tm-test-reject-results', rejectWords, rejectStatuses, 'tm');
     renderTestSummary('tm-test-summary', acceptStatuses, rejectStatuses);
 }
 
@@ -2657,8 +2677,8 @@ function dfaRunTest() {
     if (!summaryEl) return;
     if (errors.length > 0) {
         summaryEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
-        renderWordChips('dfa-test-accept-results', [], []);
-        renderWordChips('dfa-test-reject-results', [], []);
+        renderWordChips('dfa-test-accept-results', [], [], 'dfa');
+        renderWordChips('dfa-test-reject-results', [], [], 'dfa');
         return;
     }
     var prog = parseDfaProgram();
@@ -2666,8 +2686,8 @@ function dfaRunTest() {
     var rejectWords = testWordsFromInput('dfa-test-reject');
     var acceptStatuses = acceptWords.map(function(w) { return dfaTestWord(w, prog) === 'accept' ? 'pass' : 'fail'; });
     var rejectStatuses = rejectWords.map(function(w) { return dfaTestWord(w, prog) === 'reject' ? 'pass' : 'fail'; });
-    renderWordChips('dfa-test-accept-results', acceptWords, acceptStatuses);
-    renderWordChips('dfa-test-reject-results', rejectWords, rejectStatuses);
+    renderWordChips('dfa-test-accept-results', acceptWords, acceptStatuses, 'dfa');
+    renderWordChips('dfa-test-reject-results', rejectWords, rejectStatuses, 'dfa');
     renderTestSummary('dfa-test-summary', acceptStatuses, rejectStatuses);
 }
 
@@ -3057,23 +3077,23 @@ function dpdaRunTest() {
     if (!summaryEl) return;
     if (errors.length > 0) {
         summaryEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
-        renderWordChips('dpda-test-accept-results', [], []);
-        renderWordChips('dpda-test-reject-results', [], []);
+        renderWordChips('dpda-test-accept-results', [], [], 'dpda');
+        renderWordChips('dpda-test-reject-results', [], [], 'dpda');
         return;
     }
     var prog = parseDpdaProgram(errors);
     if (errors.length > 0) {
         summaryEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
-        renderWordChips('dpda-test-accept-results', [], []);
-        renderWordChips('dpda-test-reject-results', [], []);
+        renderWordChips('dpda-test-accept-results', [], [], 'dpda');
+        renderWordChips('dpda-test-reject-results', [], [], 'dpda');
         return;
     }
     var acceptWords = testWordsFromInput('dpda-test-accept');
     var rejectWords = testWordsFromInput('dpda-test-reject');
     var acceptStatuses = acceptWords.map(function(w) { return dpdaTestWord(w, prog) === 'accept' ? 'pass' : 'fail'; });
     var rejectStatuses = rejectWords.map(function(w) { return dpdaTestWord(w, prog) === 'reject' ? 'pass' : 'fail'; });
-    renderWordChips('dpda-test-accept-results', acceptWords, acceptStatuses);
-    renderWordChips('dpda-test-reject-results', rejectWords, rejectStatuses);
+    renderWordChips('dpda-test-accept-results', acceptWords, acceptStatuses, 'dpda');
+    renderWordChips('dpda-test-reject-results', rejectWords, rejectStatuses, 'dpda');
     renderTestSummary('dpda-test-summary', acceptStatuses, rejectStatuses);
 }
 
