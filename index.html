@@ -505,20 +505,31 @@
           </div>
           </div>
           <div id="tm-test-view" style="display:none;">
-            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
-              <div style="flex:1;min-width:260px;">
-                <label style="display:block;font-size:12px;font-weight:bold;color:#2e7d32;margin-bottom:4px;">Words expected to be ACCEPTED (comma-separated)</label>
-                <input id="tm-test-accept" type="text" placeholder="e.g. ab, aabb, ε" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
-                <div id="tm-test-accept-results" style="margin-top:8px;text-align:left;"></div>
+            <div id="tm-test-view-lang">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+                <div style="flex:1;min-width:260px;">
+                  <label style="display:block;font-size:12px;font-weight:bold;color:#2e7d32;margin-bottom:4px;">Words expected to be ACCEPTED (comma-separated)</label>
+                  <input id="tm-test-accept" type="text" placeholder="e.g. ab, aabb, ε" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
+                  <div id="tm-test-accept-results" style="margin-top:8px;text-align:left;"></div>
+                </div>
+                <div style="flex:1;min-width:260px;">
+                  <label style="display:block;font-size:12px;font-weight:bold;color:#c62828;margin-bottom:4px;">Words expected to be REJECTED (comma-separated)</label>
+                  <input id="tm-test-reject" type="text" placeholder="e.g. a, b, aab" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
+                  <div id="tm-test-reject-results" style="margin-top:8px;text-align:left;"></div>
+                </div>
               </div>
-              <div style="flex:1;min-width:260px;">
-                <label style="display:block;font-size:12px;font-weight:bold;color:#c62828;margin-bottom:4px;">Words expected to be REJECTED (comma-separated)</label>
-                <input id="tm-test-reject" type="text" placeholder="e.g. a, b, aab" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
-                <div id="tm-test-reject-results" style="margin-top:8px;text-align:left;"></div>
-              </div>
+              <button onclick="tmRunTest()" style="padding:6px 16px;border-radius:6px;border:1px solid #8fb8e0;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:13px;font-weight:bold;">Run Test</button>
+              <div id="tm-test-summary" style="margin-top:10px;font-family:monospace;font-size:13px;font-weight:bold;"></div>
             </div>
-            <button onclick="tmRunTest()" style="padding:6px 16px;border-radius:6px;border:1px solid #8fb8e0;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:13px;font-weight:bold;">Run Test</button>
-            <div id="tm-test-summary" style="margin-top:10px;font-family:monospace;font-size:13px;font-weight:bold;"></div>
+            <div id="tm-test-view-func" style="display:none;">
+              <div style="margin-bottom:10px;">
+                <label style="display:block;font-size:12px;font-weight:bold;color:#333;margin-bottom:4px;">Inputs (semicolon-separated; each is comma-separated args)</label>
+                <input id="tm-test-func-inputs" type="text" placeholder="e.g. 3,0,2; 5,1; 4" style="width:100%;font-family:monospace;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px;box-sizing:border-box;"/>
+                <div id="tm-test-func-results" style="margin-top:8px;text-align:left;"></div>
+              </div>
+              <button onclick="tmRunFunctionTest()" style="padding:6px 16px;border-radius:6px;border:1px solid #8fb8e0;cursor:pointer;background:#d0e4f7;font-family:inherit;font-size:13px;font-weight:bold;">Run Test</button>
+              <div id="tm-test-func-summary" style="margin-top:10px;font-family:monospace;font-size:13px;font-weight:bold;"></div>
+            </div>
           </div>
         </div>
         <div id="dfa-sim-section" style="display:none">

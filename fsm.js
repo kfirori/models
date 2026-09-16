@@ -2176,6 +2176,10 @@ function tmSetInputMode(mode) {
     var argsBtn = document.getElementById('mode-tm-args-btn');
     if (inputBtn) { inputBtn.style.background = mode === 'input' ? '#d0e4f7' : '#f0f0f0'; inputBtn.style.fontWeight = mode === 'input' ? 'bold' : 'normal'; }
     if (argsBtn) { argsBtn.style.background = mode === 'args' ? '#d0e4f7' : '#f0f0f0'; argsBtn.style.fontWeight = mode === 'args' ? 'bold' : 'normal'; }
+    var langView = document.getElementById('tm-test-view-lang');
+    var funcView = document.getElementById('tm-test-view-func');
+    if (langView) langView.style.display = mode === 'args' ? 'none' : '';
+    if (funcView) funcView.style.display = mode === 'args' ? '' : 'none';
     tmUpdateInputPlaceholder();
 }
 
@@ -2188,19 +2192,8 @@ function tmUpdateInputPlaceholder() {
 }
 
 function tmDecodeResult() {
-    var positions = [];
-    for (var i = 0; i < tmTape.length; i++) {
-        if (tmTape[i] === '$') positions.push(i);
-    }
-    if (positions.length !== 2) return 'Error';
-    var between = tmTape.slice(positions[0] + 1, positions[1]).join('');
-    var segments = between.split('#');
-    var nums = [];
-    for (var j = 0; j < segments.length; j++) {
-        if (segments[j] !== '' && !/^1+$/.test(segments[j])) return 'Error';
-        nums.push(segments[j].length);
-    }
-    return nums.join(',');
+    var decoded = tmDecodeTape(tmTape);
+    return decoded === null ? 'Error' : decoded;
 }
 
 function tmUpdateResult() {
@@ -2301,7 +2294,7 @@ function tmInit() {
     draw();
 }
 
-function tmTestWord(word, prog) {
+function tmRunProgram(word, prog) {
     var DASHV = String.fromCharCode(8867);
     var tape = [DASHV].concat(word.length > 0 ? word.split('') : ['_']);
     var head = 1;
@@ -2312,17 +2305,89 @@ function tmTestWord(word, prog) {
         var cell = (head >= 0 && head < tape.length) ? tape[head] : '_';
         if (!cell) cell = '_';
         var trans = prog.transitions[state + '|' + cell];
-        if (!trans) return prog.acceptStates.indexOf(state) !== -1 ? 'accept' : 'reject';
-        if (head === 0 && trans.write !== DASHV) return 'reject';
-        if (trans.dir === 'l' && head === 0) return 'reject';
+        if (!trans) return { halted: true, accepted: prog.acceptStates.indexOf(state) !== -1, tape: tape };
+        if (head === 0 && trans.write !== DASHV) return { halted: true, accepted: false, tape: tape };
+        if (trans.dir === 'l' && head === 0) return { halted: true, accepted: false, tape: tape };
         tape[head] = trans.write;
         if (trans.dir === 'r') { head++; if (head >= tape.length) tape.push('_'); }
         else if (trans.dir === 'l') { head--; }
         state = trans.to;
-        if (prog.acceptStates.length > 0 && prog.acceptStates.indexOf(state) !== -1) return 'accept';
+        if (prog.acceptStates.length > 0 && prog.acceptStates.indexOf(state) !== -1) return { halted: true, accepted: true, tape: tape };
         steps++;
     }
-    return 'timeout';
+    return { halted: false, accepted: false, tape: tape };
+}
+
+function tmTestWord(word, prog) {
+    var r = tmRunProgram(word, prog);
+    if (!r.halted) return 'timeout';
+    return r.accepted ? 'accept' : 'reject';
+}
+
+function tmDecodeTape(tape) {
+    var positions = [];
+    for (var i = 0; i < tape.length; i++) {
+        if (tape[i] === '$') positions.push(i);
+    }
+    if (positions.length !== 2) return null;
+    var between = tape.slice(positions[0] + 1, positions[1]).join('');
+    var segments = between.split('#');
+    var nums = [];
+    for (var j = 0; j < segments.length; j++) {
+        if (segments[j] !== '' && !/^1+$/.test(segments[j])) return null;
+        nums.push(segments[j].length);
+    }
+    return nums.join(',');
+}
+
+function tmTestFunctionInput(rawInput, prog) {
+    var input = tmConvertArgs(rawInput);
+    var r = tmRunProgram(input, prog);
+    var decoded = r.halted ? tmDecodeTape(r.tape) : null;
+    var ok = r.halted && r.accepted && decoded !== null;
+    var resultText = !r.halted ? '(did not halt)' : (!r.accepted ? '(rejected)' : (decoded === null ? 'Error' : decoded));
+    return { input: rawInput, label: rawInput + ' → ' + resultText, ok: ok };
+}
+
+function renderFunctionChips(containerId, results) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    if (results.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = results.map(function(r) {
+        return '<span data-type="tm" data-word="' + escapeHtml(r.input) + '" ondblclick="testWordDblClick(this)" title="Double-click to load in Simulation" ' +
+            'style="display:inline-flex;align-items:center;padding:3px 10px;margin:3px 6px 0 0;border-radius:14px;font-family:monospace;font-size:13px;cursor:pointer;' +
+            chipStyle(r.ok ? 'pass' : 'fail') + '">' + escapeHtml(r.label) + '</span>';
+    }).join('');
+}
+
+function testInputsFromSemicolonInput(id) {
+    var el = document.getElementById(id);
+    if (!el) return [];
+    return el.value.split(';').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+}
+
+function tmRunFunctionTest() {
+    var errors = tmCompile();
+    draw();
+    var resultsEl = document.getElementById('tm-test-func-results');
+    var summaryEl = document.getElementById('tm-test-func-summary');
+    if (!resultsEl) return;
+    if (errors.length > 0) {
+        resultsEl.innerHTML = '';
+        if (summaryEl) summaryEl.innerHTML = '<span style="color:#c62828;">' + errors.join('<br>') + '</span>';
+        return;
+    }
+    var prog = parseTuringProgram();
+    var inputs = testInputsFromSemicolonInput('tm-test-func-inputs');
+    var results = inputs.map(function(raw) { return tmTestFunctionInput(raw, prog); });
+    renderFunctionChips('tm-test-func-results', results);
+    if (summaryEl) {
+        if (inputs.length === 0) { summaryEl.textContent = ''; }
+        else {
+            var okCount = results.filter(function(r) { return r.ok; }).length;
+            summaryEl.textContent = okCount + ' / ' + inputs.length + ' computed';
+        }
+    }
 }
 
 function tmRunTest() {
