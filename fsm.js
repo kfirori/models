@@ -1328,8 +1328,83 @@ function drawUsing(c) {
 }
 
 function draw() {
+    autoDetectSimMode();
     drawUsing(canvas.getContext("2d"));
     saveBackup();
+}
+
+// ─── Automatic simulation mode detection ─────────────────────────────────────
+
+var lastLabelSignature = null;
+
+function labelMatchesDfa(text) {
+    return text.trim().split(',').every(function(s) { return s.trim().length === 1; });
+}
+
+function labelMatchesDpda(text) {
+    var lines = dpdaSplitRules(text);
+    if (!lines.length) return false;
+    return lines.every(function(line) {
+        var rule = dpdaParseRule(line);
+        return rule !== null && rule.inputSym.length === 1 &&
+            (rule.stackSym === '\\estack' || rule.stackSym.length === 1);
+    });
+}
+
+function labelMatchesTm(text) {
+    var sym = '(?:\\\\[a-zA-Z]+|@[cts]|[^\\s/])';
+    var symNc = '(?:\\\\[a-zA-Z]+|@[cts]|[^\\s/,])';
+    var patternSpace = new RegExp('^' + sym + '\\/' + sym + '\\s+[LRlr]$');
+    var patternComma = new RegExp('^' + symNc + '\\/' + symNc + ',[LRlr]$');
+    var useComma = /[^\s\/],[LRlr](\s|$)/i.test(text);
+    var segments = text.trim().split(useComma ? /\s+/ : /\s{2,}/).filter(function(s) { return s.trim(); });
+    if (!segments.length) return false;
+    return segments.every(function(seg) {
+        seg = seg.trim();
+        return patternSpace.test(seg) || patternComma.test(seg);
+    });
+}
+
+// Classifies every labeled transition by format and returns the majority mode
+// as {mode, tmMode}, or null when there are no labeled transitions.
+function detectSimMode() {
+    var votes = { dfa: 0, dpda: 0, tm: 0 };
+    var tmUsesDollar = false;
+    var labeled = 0;
+    for (var i = 0; i < links.length; i++) {
+        var link = links[i];
+        if (!(link instanceof Link) && !(link instanceof SelfLink)) continue;
+        if (!link.text || !link.text.trim()) continue;
+        labeled++;
+        if (labelMatchesDfa(link.text)) votes.dfa++;
+        if (labelMatchesDpda(link.text)) votes.dpda++;
+        if (labelMatchesTm(link.text)) {
+            votes.tm++;
+            if (link.text.indexOf('$') !== -1) tmUsesDollar = true;
+        }
+    }
+    if (labeled === 0) return null;
+    // On a tie, keep the current mode if it is among the leaders; otherwise prefer TM, then DPDA, then DFA.
+    var order = ['tm', 'dpda', 'dfa'];
+    if (order.indexOf(simMode) !== -1) order.unshift(simMode);
+    var best = null;
+    for (var j = 0; j < order.length; j++) {
+        if (best === null || votes[order[j]] > votes[best]) best = order[j];
+    }
+    if (votes[best] === 0) return null;
+    return { mode: best, tmMode: best === 'tm' ? (tmUsesDollar ? 'args' : 'input') : null };
+}
+
+function autoDetectSimMode() {
+    var signature = links.map(function(l) {
+        return (l instanceof Link || l instanceof SelfLink) ? l.text : '';
+    }).join('\u0000');
+    if (signature === lastLabelSignature) return;
+    lastLabelSignature = signature;
+    var detected = detectSimMode();
+    if (!detected || typeof setSimMode !== 'function') return;
+    if (detected.mode === simMode && (detected.mode !== 'tm' || detected.tmMode === tmInputMode)) return;
+    setSimMode(detected.mode, detected.tmMode);
 }
 
 function clearCanvas() {
