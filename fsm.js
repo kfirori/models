@@ -1549,6 +1549,27 @@ function autoAdjustLinkCurve(link) {
     }
 }
 
+// When a new link B→A would overlap an existing straight link A→B, curve both
+// slightly: the existing one upwards (or left, if vertical) and the new one the other way.
+function separateOpposingLinks(link) {
+    if (!(link instanceof Link) || link.perpendicularPart !== 0) return;
+    for (var i = 0; i < links.length; i++) {
+        var other = links[i];
+        if (!(other instanceof Link) || other === link) continue;
+        if (other.nodeA !== link.nodeB || other.nodeB !== link.nodeA) continue;
+        if (other.perpendicularPart !== 0) continue;
+        var dx = other.nodeB.x - other.nodeA.x;
+        var dy = other.nodeB.y - other.nodeA.y;
+        // Anchor y-offset of `other` is dx * p / scale; pick p so it points up (negative y).
+        var sign = dx !== 0 ? -Math.sign(dx) : Math.sign(dy);
+        var p = sign * nodeRadius * 0.6;
+        // The same p on the reversed link bends to the opposite side.
+        other.perpendicularPart = p;
+        link.perpendicularPart = p;
+        return;
+    }
+}
+
 function selectObject(x, y) {
     for (var i = 0; i < nodes.length; i++) {
         if (nodes[i].containsPoint(x, y)) {
@@ -1726,6 +1747,7 @@ window.onload = function () {
         if (currentLink != null) {
             if (!(currentLink instanceof TemporaryLink)) {
                 autoAdjustLinkCurve(currentLink);
+                separateOpposingLinks(currentLink);
                 selectedObject = currentLink;
                 links.push(currentLink);
                 resetCaret();
